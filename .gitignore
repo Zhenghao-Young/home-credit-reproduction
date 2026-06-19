@@ -1,0 +1,56 @@
+# macOS / editor junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+.Spotlight-V100/
+.Trashes/
+.idea/
+.vscode/
+
+# Python cache / tooling
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs and runtime files
+*.log
+*.out
+*.err
+
+# Common ML / notebook outputs
+checkpoints/
+models/
+outputs/
+runs/
+artifacts/
+experiment_dir/
+*.ckpt
+*.pth
+*.pt
+*.joblib
+*.pkl
+*.pickle
+
+# Local datasets / package caches
+home-credit-default-risk/
+.conda-pkgs/

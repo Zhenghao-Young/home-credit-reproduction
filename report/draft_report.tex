@@ -1,0 +1,165 @@
+\documentclass[11pt]{report}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+
+\title{Controlled Reproduction of the Home Credit Open Solution}
+\author{Industrial Data Analytics Project}
+\date{\today}
+
+\begin{document}
+\pagenumbering{roman}
+\maketitle
+\clearpage
+\pagenumbering{arabic}
+
+\chapter{Problem Setting and Research Questions}
+
+\section{Task Background}
+
+The Home Credit Default Risk task asks whether a loan applicant will have repayment difficulty. Each applicant is identified by \texttt{SK\_ID\_CURR}, and the binary target \texttt{TARGET} equals 1 for applicants with repayment difficulty. The official evaluation metric is the area under the ROC curve (AUC), which measures whether risky applicants receive higher predicted probabilities than non-risky applicants.
+
+The data are relational rather than a single flat table. The central application table contains one row per applicant, while the remaining tables describe credit bureau records, previous applications, installments, point-of-sale cash loans, and credit card behavior. The main modeling challenge is therefore not only fitting a classifier, but also transforming variable-length historical records into applicant-level features.
+
+\section{Open Solution Development Path}
+
+The open-source Home Credit solution evolved through six named versions. The versions are useful for understanding the modeling logic, but they cannot be compared directly as controlled experiments because feature engineering, cleaning rules, models, and parameters changed at the same time.
+
+\begin{table}[h]
+\centering
+\caption{Historical open-solution stages used as the project reference.}
+\begin{tabular}{p{0.18\linewidth}p{0.36\linewidth}p{0.34\linewidth}}
+\toprule
+Version & Main change & Role in this project \\
+\midrule
+Chestnut & Application-table baseline & S1 baseline \\
+Seedling & Application group aggregations and more models & S2 group aggregation \\
+Blossom & Historical-table aggregates & S3 historical information \\
+Tulip & Relative group features and recent behavior & S4 refined representation \\
+Sunflower & Cleaning fixes and dynamic features & B2/S5 cleaning and dynamics \\
+Four Leaf Clover & Stacking over OOF predictions & S6 ensemble \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The central project question is: when the open solution improves, which added information structure is responsible for the gain? We do not attempt to reproduce every original feature exactly. Instead, we build a controlled reproduction that turns on one feature block at a time while holding the cross-validation split and LightGBM configuration fixed.
+
+\section{Research Questions}
+
+The report is organized around three research questions.
+
+\textbf{RQ1: What explains the early gain from Chestnut to Blossom?} We separate three candidate sources: generic application-table group aggregations, hand-crafted application ratios, and historical-table aggregates.
+
+\textbf{RQ2: What explains the later gain from Blossom to Sunflower?} We examine relative position within a peer group, recent repayment or application behavior, cleaning before aggregation, and short-term versus long-term dynamics.
+
+\textbf{RQ3: Why can stacking still improve after feature engineering?} We use out-of-fold predictions to test whether models trained on different feature blocks make sufficiently different errors for a second-level model to exploit.
+
+\section{Working Hypothesis}
+
+Our working hypothesis is that the largest performance gains should come from relational and temporal feature representations rather than from model selection alone. Group aggregations may help, but they are expected to be weaker than historical-table features and dynamic behavior features. Stacking is expected to provide a smaller marginal gain because strong first-level models are likely to share many of the same risk signals.
+
+\chapter{Controlled Reproduction Design}
+
+\section{Why Controlled Reproduction Is Needed}
+
+The original version history is not a clean ablation study. A higher score in a later version may be caused by more features, different cleaning, different model classes, different hyperparameters, or stacking. To make the comparison interpretable, we fix the experimental infrastructure and change only the feature block associated with each stage.
+
+All main LightGBM stages use the same five stratified folds, the same model parameters, and the same output format. The fold assignment is stored in \texttt{data/folds.csv}; later training commands only read this file and do not create new random splits.
+
+\section{Evaluation Protocol}
+
+The primary metric is out-of-fold AUC. For each fold, the model is trained on four folds and predicts the held-out fold. Concatenating the five validation predictions gives one prediction for every training applicant:
+
+\[
+\text{OOF} =
+\left\{
+(\texttt{SK\_ID\_CURR}_i, y_i, \hat p_i, \texttt{fold\_id}_i)
+\right\}_{i=1}^{n}.
+\]
+
+The OOF AUC is then computed over the full training set. This is preferred over training-set AUC because each prediction is made by a model that did not train on that applicant. We also report the mean and standard deviation of the five fold AUC values.
+
+\section{Experiment Matrix}
+
+\begin{table}[h]
+\centering
+\caption{Controlled feature stages.}
+\begin{tabular}{lll}
+\toprule
+Stage & Feature content & Purpose \\
+\midrule
+S1 & Application numerical and categorical features & Baseline \\
+S2 & S1 + application group aggregation values & Generic group aggregation \\
+B1 & S1 + business ratios and \texttt{EXT\_SOURCE} summaries & Application business features \\
+S3 & B1 + basic historical-table aggregates & Historical information \\
+S4 & S3 + relative group position and recent windows & Refined representation \\
+B2 & S4 with cleaning before aggregation & Cleaning-order effect \\
+S5 & B2 + short/long ratios and trend features & Dynamic behavior \\
+S6 & Stacking over first-level OOF predictions & Prediction complementarity \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{S1 Baseline}
+
+S1 uses only the application table. Numerical and categorical columns follow the original project's \texttt{NUMERICAL\_COLUMNS} and \texttt{CATEGORICAL\_COLUMNS}. The identifier \texttt{SK\_ID\_CURR} and target \texttt{TARGET} are not model features. Several known abnormal codes are converted to missing values, including \texttt{DAYS\_EMPLOYED=365243}, \texttt{CODE\_GENDER=XNA}, \texttt{NAME\_FAMILY\_STATUS=Unknown}, \texttt{ORGANIZATION\_TYPE=XNA}, and \texttt{DAYS\_LAST\_PHONE\_CHANGE=0}.
+
+S1 deliberately excludes ratios, group aggregations, historical-table features, and dynamic windows. It provides the reference point for measuring the effect of later feature blocks.
+
+\section{S2 Application Group Aggregations}
+
+S2 adds fold-safe application-table group aggregation values to S1. The current controlled S2 uses the repository's \texttt{FULL\_GROUPBY\_SPECS}: 301 group aggregation features plus the 78 S1 features, for 379 total features.
+
+The aggregation values include \texttt{min}, \texttt{mean}, \texttt{max}, \texttt{sum}, \texttt{var}, and \texttt{median} over core application variables such as credit amount, annuity, income, goods price, external scores, age-related day counts, family counts, and car age. The main group keys include education by gender, family status by education, and family status by gender, together with several more specific occupational and regional combinations.
+
+S2 only keeps the group aggregation values. It does not create difference features such as $x-\overline{x}_{g(i)}$ or absolute difference features. Those are reserved for the later S4 relative-position experiment.
+
+\section{Fold-Safe Groupby Rule}
+
+Every group aggregation is fitted inside the current training fold only. For a validation or test applicant, the fitted group table is used as a lookup table. If the validation or test group was not observed in the training fold, the feature is filled with the training-fold global mean of that aggregation. The target is never used in groupby construction.
+
+This rule avoids leakage: validation rows never contribute to the statistics used to predict themselves.
+
+\section{S2 Logistic Bridge}
+
+To test whether the Seedling-style feature space benefits specifically from nonlinear tree models, we also train an $L_2$-regularized Logistic Regression on the same 379 S2 features. Numerical variables are median-imputed and standardized within the training fold. Categorical variables are one-hot encoded with unseen categories ignored at transform time. This model is not the main S2 result; it is a bridge experiment and a possible input to the later stacking stage.
+
+\section{Current Member A Results}
+
+Table~\ref{tab:member-a-results} summarizes the current Member A outputs. S2 uses the 379-feature controlled group aggregation version. S2-full is a separate diagnostic run that also includes group-difference features and is therefore not the single official S2 stage.
+
+\begin{table}[h]
+\centering
+\caption{Current Member A controlled reproduction results.}
+\label{tab:member-a-results}
+\begin{tabular}{lrrrr}
+\toprule
+Stage & Model & Features & OOF AUC & Fold AUC std \\
+\midrule
+S1 & LightGBM & 78 & 0.757646 & 0.002460 \\
+S2 & LightGBM & 379 & 0.757405 & 0.002358 \\
+S2-full & LightGBM & 801 & 0.760329 & 0.002746 \\
+S2-Logistic & Logistic & 379 & 0.742940 & 0.003648 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The controlled S2 stage does not improve over S1 in OOF AUC. This suggests that simply adding application-table group aggregation values is not sufficient to reproduce the stronger gain observed in the original Seedling history. In contrast, S2-full improves the OOF AUC, indicating that the larger original-style feature block, especially group-relative difference features, carries additional signal. This distinction is important for the later report: S2 should be interpreted as the controlled group-aggregation test, while S2-full is evidence about what is lost when the relative-position part is removed.
+
+\section{Reproducibility Artifacts}
+
+Each stage writes the same four core artifacts:
+
+\begin{verbatim}
+results/<stage>/oof.parquet
+results/<stage>/fold_metrics.csv
+results/<stage>/feature_names.txt
+results/<stage>/config.yaml
+\end{verbatim}
+
+The OOF file contains \texttt{SK\_ID\_CURR}, \texttt{TARGET}, \texttt{fold\_id}, and \texttt{prediction}. The implementation validates that every training applicant appears exactly once, that predictions are finite probabilities in $[0,1]$, and that fold identifiers match \texttt{data/folds.csv}.
+
+\end{document}

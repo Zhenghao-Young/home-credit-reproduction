@@ -1,0 +1,12 @@
+# Runtime dependencies for the controlled Home Credit reproduction in plan.md.
+numpy==1.24.4
+pandas==1.5.3
+scipy==1.10.1
+scikit-learn==1.2.2
+lightgbm==3.3.5
+pyarrow==21.0.0
+matplotlib==3.9.4
+PyYAML==6.0.1
+tqdm==4.67.1
+joblib==1.5.1
+kaggle==1.7.4.5
