@@ -30,7 +30,26 @@ results/s2_full/
 results/s2_logistic/
 ```
 
-`results/` 需要上传远程仓库，用于同步 OOF、submission 和 fold metrics 给其他成员。原始数据目录 `home-credit-default-risk/` 不应上传。
+`results/` 需要上传远程仓库，用于同步 OOF、submission 和 fold metrics 给其他成员。原始数据 CSV 不应上传。
+
+## 数据目录
+
+仓库保留一个空的 `home-credit-default-risk/` 目录作为数据放置位置。运行实验前，需要把 Kaggle 原始 CSV 文件放到该目录下：
+
+```text
+home-credit-default-risk/application_train.csv
+home-credit-default-risk/application_test.csv
+home-credit-default-risk/sample_submission.csv
+home-credit-default-risk/bureau.csv
+home-credit-default-risk/bureau_balance.csv
+home-credit-default-risk/previous_application.csv
+home-credit-default-risk/installments_payments.csv
+home-credit-default-risk/POS_CASH_balance.csv
+home-credit-default-risk/credit_card_balance.csv
+home-credit-default-risk/HomeCredit_columns_description.csv
+```
+
+这些 CSV 是本地数据文件，已被 `.gitignore` 排除，不会上传到远程仓库。只有 `home-credit-default-risk/.gitkeep` 会被提交，用来保留空目录结构。
 
 ## 环境配置
 
