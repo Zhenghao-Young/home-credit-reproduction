@@ -15,7 +15,7 @@
 - [x] M2：RQ1 完成，S1、S2、B1、S3 结果可比较，RQ1 表图与报告第 3 章已完成。
 - [x] M3：RQ2 完成，S4、B2、S5 结果可比较。
 - [x] M4：RQ3 完成，简单平均和 Logistic stacking 结果已产出，S6 对比分析已生成。
-- [~] M5：最终报告在 `report/` 中编译完成。
+- [x] M5：最终报告在 `report/` 中编译完成（26 页）。
 
 ## Member A：基础设施、S1、S2
 
@@ -111,8 +111,8 @@ S1、S2、S2-full、S2-Logistic、B1、S3、S4、B2 和 S5 均已提交到 Kaggl
 - [x] 生成 `results/rq3/meta_coefficients.csv`。
 - [x] 生成 `results/rq3/prediction_correlation.png`。
 - [x] 生成 `results/rq3/final_evidence_chain.png`。
-- [ ] 起草报告第 5、6 章。
-- [ ] 整合并编译 `report/` 中的最终报告。
+- [x] 起草报告第 5、6 章。
+- [x] 整合并编译 `report/` 中的最终报告（`draft_report.pdf`，26 页）。
 
 RQ3 当前关键发现：
 
