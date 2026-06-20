@@ -1,0 +1,4 @@
+[submodule "open-solution"]
+	path = open-solution
+	url = https://github.com/minerva-ml/open-solution-home-credit.git
+	branch = master
