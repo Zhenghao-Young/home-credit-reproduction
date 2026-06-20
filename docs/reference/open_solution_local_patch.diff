@@ -1,0 +1,214 @@
+diff --git a/open-solution/configs/neptune.yaml b/open-solution-home-credit/configs/neptune.yaml
+index c121df7..ba7ed7e 100644
+--- a/open-solution/configs/neptune.yaml
++++ b/open-solution-home-credit/configs/neptune.yaml
+@@ -19,17 +19,17 @@ exclude:
+ 
+ parameters:
+ # Data
+-  train_filepath:                  YOUR/PATH/TO/application_train.csv
+-  test_filepath:                   YOUR/PATH/TO/application_test.csv
+-  bureau_balance_filepath:         YOUR/PATH/TO/bureau_balance.csv
+-  bureau_filepath:                 YOUR/PATH/TO/bureau.csv
+-  credit_card_balance_filepath:    YOUR/PATH/TO/credit_card_balance.csv
+-  installments_payments_filepath:  YOUR/PATH/TO/installments_payments.csv
+-  POS_CASH_balance_filepath:       YOUR/PATH/TO/POS_CASH_balance.csv
+-  previous_application_filepath:   YOUR/PATH/TO/previous_application.csv
+-  sample_submission_filepath:      YOUR/PATH/TO/sample_submission.csv
+-  first_level_oof_predictions_dir: YOUR/PATH/TO/oof_predictions
+-  experiment_directory:            YOUR/PATH/WORKDIR
++  train_filepath:                  /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/application_train.csv
++  test_filepath:                   /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/application_test.csv
++  bureau_balance_filepath:         /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/bureau_balance.csv
++  bureau_filepath:                 /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/bureau.csv
++  credit_card_balance_filepath:    /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/credit_card_balance.csv
++  installments_payments_filepath:  /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/installments_payments.csv
++  POS_CASH_balance_filepath:       /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/POS_CASH_balance.csv
++  previous_application_filepath:   /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/previous_application.csv
++  sample_submission_filepath:      /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/sample_submission.csv
++  first_level_oof_predictions_dir: /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/home-credit-default-risk/oof_predictions
++  experiment_directory:            /Users/chenghaoyang/Documents/课程/博一/工业数据分析/project/experiment_dir
+ 
+ # Kaggle
+   kaggle_api: 0
+diff --git a/open-solution-home-credit/deepsense/__init__.py b/open-solution-home-credit/deepsense/__init__.py
+new file mode 100644
+index 0000000..40e0755
+--- /dev/null
++++ b/open-solution-home-credit/deepsense/__init__.py
+@@ -0,0 +1,3 @@
++from . import neptune
++
++__all__ = ["neptune"]
+diff --git a/open-solution-home-credit/deepsense/neptune.py b/open-solution-home-credit/deepsense/neptune.py
+new file mode 100644
+index 0000000..7587bb2
+--- /dev/null
++++ b/open-solution-home-credit/deepsense/neptune.py
+@@ -0,0 +1,10 @@
++class OfflineContextParams:
++    pass
++
++
++class Context:
++    def __init__(self):
++        self.params = OfflineContextParams()
++
++    def channel_send(self, *args, **kwargs):
++        return None
+diff --git a/open-solution/src/callbacks.py b/open-solution-home-credit/src/callbacks.py
+index 44198ae..d788179 100644
+--- a/open-solution/src/callbacks.py
++++ b/open-solution-home-credit/src/callbacks.py
+@@ -1,6 +1,10 @@
+ from deepsense import neptune
+ 
+-from keras.callbacks import Callback
++try:
++    from keras.callbacks import Callback
++except ImportError:
++    class Callback:
++        pass
+ 
+ ctx = neptune.Context()
+ 
+diff --git a/open-solution/src/data_cleaning.py b/open-solution-home-credit/src/data_cleaning.py
+index acf8341..1619ed6 100644
+--- a/open-solution/src/data_cleaning.py
++++ b/open-solution-home-credit/src/data_cleaning.py
+@@ -1,4 +1,6 @@
+ import numpy as np
++
++from . import sklearn_compat  # noqa: F401
+ from steppy.base import BaseTransformer
+ from steppy.utils import get_logger
+ from . import pipeline_config as cfg
+diff --git a/open-solution/src/feature_extraction.py b/open-solution-home-credit/src/feature_extraction.py
+index 795eeb4..a21a447 100644
+--- a/open-solution/src/feature_extraction.py
++++ b/open-solution-home-credit/src/feature_extraction.py
+@@ -6,7 +6,8 @@ import numpy as np
+ import pandas as pd
+ import cmath
+ from scipy.stats import kurtosis, iqr, skew
+-from sklearn.externals import joblib
++import joblib
++from . import sklearn_compat  # noqa: F401
+ from sklearn.linear_model import LinearRegression
+ from steppy.base import BaseTransformer
+ from steppy.utils import get_logger
+diff --git a/open-solution/src/models.py b/open-solution-home-credit/src/models.py
+index 4eb017f..639a9a2 100644
+--- a/open-solution/src/models.py
++++ b/open-solution-home-credit/src/models.py
+@@ -4,18 +4,26 @@ from deepsense import neptune
+ import lightgbm as lgb
+ import numpy as np
+ import pandas as pd
+-from sklearn.externals import joblib
++import joblib
++from . import sklearn_compat  # noqa: F401
+ from steppy.base import BaseTransformer
+-from keras import backend as K
+-from keras.models import Sequential
+-from keras.optimizers import Adam, SGD
+-from toolkit.keras_transformers.models import ClassifierXY
+ from toolkit.sklearn_transformers.models import SklearnClassifier
+-from keras.layers import Dense, Activation, BatchNormalization, Dropout
+-from keras.regularizers import l1_l2
+ import xgboost as xgb
+ import catboost as ctb
+ 
++try:
++    from keras import backend as K
++    from keras.models import Sequential
++    from keras.optimizers import Adam, SGD
++    from keras.layers import Dense, Activation, BatchNormalization, Dropout
++    from keras.regularizers import l1_l2
++    from toolkit.keras_transformers.models import ClassifierXY
++    KERAS_AVAILABLE = True
++except ImportError:
++    K = Sequential = Adam = SGD = Dense = Activation = BatchNormalization = Dropout = l1_l2 = None
++    ClassifierXY = object
++    KERAS_AVAILABLE = False
++
+ from .callbacks import neptune_monitor_lgbm, NeptuneMonitor
+ from .utils import get_logger
+ 
+@@ -247,6 +255,8 @@ def callbacks(channel_prefix):
+ 
+ class NeuralNetwork(ClassifierXY):
+     def __init__(self, architecture_config, training_config, callbacks_config, **kwargs):
++        if not KERAS_AVAILABLE:
++            raise ImportError('Neural network pipeline requires keras/tensorflow to be installed.')
+         super().__init__(architecture_config, training_config, callbacks_config)
+         logger.info('initializing Neural Network...')
+         self.params = kwargs
+diff --git a/open-solution/src/pipeline_blocks.py b/open-solution-home-credit/src/pipeline_blocks.py
+index a46994b..85c3736 100644
+--- a/open-solution/src/pipeline_blocks.py
++++ b/open-solution-home-credit/src/pipeline_blocks.py
+@@ -1,6 +1,7 @@
+ import category_encoders as ce
+ 
+ import numpy as np
++from . import sklearn_compat  # noqa: F401
+ from steppy.adapter import Adapter, E
+ from steppy.base import Step, make_transformer, IdentityOperation
+ 
+diff --git a/open-solution/src/pipeline_config.py b/open-solution-home-credit/src/pipeline_config.py
+index 6286b82..2054afd 100644
+--- a/open-solution/src/pipeline_config.py
++++ b/open-solution-home-credit/src/pipeline_config.py
+@@ -1,10 +1,15 @@
++import os
++
+ from attrdict import AttrDict
+ from deepsense import neptune
+ 
+ from .utils import read_params, parameter_eval
+ 
+ ctx = neptune.Context()
+-params = read_params(ctx, fallback_file='../configs/neptune.yaml')
++params = read_params(
++    ctx,
++    fallback_file=os.path.join(os.path.dirname(__file__), '..', 'configs', 'neptune.yaml'),
++)
+ 
+ RANDOM_SEED = 90210
+ DEV_SAMPLE_SIZE = 100
+diff --git a/open-solution-home-credit/src/sklearn_compat.py b/open-solution-home-credit/src/sklearn_compat.py
+new file mode 100644
+index 0000000..7760181
+--- /dev/null
++++ b/open-solution-home-credit/src/sklearn_compat.py
+@@ -0,0 +1,5 @@
++import joblib
++import sklearn.externals as sklearn_externals
++
++if not hasattr(sklearn_externals, "joblib"):
++    sklearn_externals.joblib = joblib
+diff --git a/open-solution/src/utils.py b/open-solution-home-credit/src/utils.py
+index 4d893bc..0081fde 100644
+--- a/open-solution/src/utils.py
++++ b/open-solution-home-credit/src/utils.py
+@@ -11,8 +11,9 @@ import pandas as pd
+ from tqdm import tqdm
+ import yaml
+ from attrdict import AttrDict
++from . import sklearn_compat  # noqa: F401
+ from steppy.base import BaseTransformer
+-from sklearn.externals import joblib
++import joblib
+ import sklearn.preprocessing as prep
+ 
+ 
+@@ -65,7 +66,7 @@ def read_params(ctx, fallback_file):
+ 
+ def read_yaml(filepath):
+     with open(filepath) as f:
+-        config = yaml.load(f)
++        config = yaml.safe_load(f)
+     return AttrDict(config)
+ 
+ 

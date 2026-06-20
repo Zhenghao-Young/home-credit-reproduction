@@ -52,6 +52,6 @@ experiment_dir/
 *.pickle
 
 # Local datasets / package caches
-home-credit-default-risk/*
-!home-credit-default-risk/.gitkeep
+data/original/*
+!data/original/.gitkeep
 .conda-pkgs/
