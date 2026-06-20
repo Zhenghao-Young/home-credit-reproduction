@@ -77,9 +77,13 @@ PY -c "import pandas as pd; from src.split import load_folds; from src.metrics i
 Compile the report from `report/`:
 
 ```bash
-pdflatex -interaction=nonstopmode draft_report.tex
-pdflatex -interaction=nonstopmode draft_report.tex
+xelatex -interaction=nonstopmode draft_report.tex
+xelatex -interaction=nonstopmode draft_report.tex
 ```
+
+The report is written in Chinese and uses the `ctexrep` class, so build it with
+XeLaTeX rather than `pdflatex`; on Windows it relies on system CJK fonts via
+`fontset=windows`.
 
 ## Architecture Notes
 

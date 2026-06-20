@@ -57,7 +57,7 @@ Validate a stage's OOF against the folds (this is the project's de-facto test):
 PY -c "import pandas as pd; from src.split import load_folds; from src.metrics import validate_oof, summarize_oof_auc; folds=load_folds('data/folds.csv'); oof=pd.read_parquet('results/s2/oof.parquet'); validate_oof(oof, folds); print(summarize_oof_auc(oof))"
 ```
 
-Compile the report: `cd report && pdflatex -interaction=nonstopmode draft_report.tex` (twice).
+Compile the report: `cd report && xelatex -interaction=nonstopmode draft_report.tex` (twice). The report is written in Chinese and uses the `ctexrep` class, so it must be built with **XeLaTeX** (not `pdflatex`); on Windows it relies on the system CJK fonts via `fontset=windows`.
 
 ## Architecture
 
