@@ -36,11 +36,12 @@ from src.features.relative_recent import (
     build_b2_precomputed_features,
     build_s4_precomputed_features,
 )
+from src.features.dynamic import build_s5_dynamic_features
 from src.metrics import auc_score, build_fold_metrics, summarize_oof_auc, validate_oof
 from src.split import FOLD_COLUMN, load_folds
 
 
-SUPPORTED_STAGES = {"s1", "b1", "s2", "s2_full", "s2_logistic", "s3", "s4", "b2"}
+SUPPORTED_STAGES = {"s1", "b1", "s2", "s2_full", "s2_logistic", "s3", "s4", "b2", "s5"}
 SUPPORTED_MODELS = {"lightgbm", "logistic"}
 MISSING_CATEGORY = "__MISSING__"
 UNKNOWN_CATEGORY = "__UNKNOWN__"
@@ -86,8 +87,8 @@ def run_cv(stage: str, model_name: str, config_path: str | Path, predict_test: b
         raise ValueError(f"unsupported stage {stage!r}; expected one of {sorted(SUPPORTED_STAGES)}")
     if model_name not in SUPPORTED_MODELS:
         raise ValueError(f"unsupported model {model_name!r}; expected one of {sorted(SUPPORTED_MODELS)}")
-    if stage in {"s1", "b1", "s3", "s4", "b2"} and model_name != "lightgbm":
-        raise ValueError("S1, B1, S3, S4, and B2 are only defined for LightGBM")
+    if stage in {"s1", "b1", "s3", "s4", "b2", "s5"} and model_name != "lightgbm":
+        raise ValueError("S1, B1, S3, S4, B2, and S5 are only defined for LightGBM")
     if stage == "s2_logistic" and model_name != "logistic":
         raise ValueError("s2_logistic must use --model logistic")
     if stage in {"s2", "s2_full"} and model_name != "lightgbm":
@@ -110,6 +111,11 @@ def run_cv(stage: str, model_name: str, config_path: str | Path, predict_test: b
         history_features, history_feature_names = build_s4_precomputed_features(data_dir)
     if stage == "b2":
         history_features, history_feature_names = build_b2_precomputed_features(data_dir)
+    if stage == "s5":
+        b2_features, b2_names = build_b2_precomputed_features(data_dir)
+        dynamic_features, dynamic_names = build_s5_dynamic_features(data_dir, b2_features)
+        history_features = b2_features.merge(dynamic_features, on=ID_COLUMN, how="outer", validate="one_to_one")
+        history_feature_names = b2_names + dynamic_names
     test_base_features = None
     test_support = None
     if predict_test:
@@ -277,7 +283,7 @@ def _build_fold_features(
             test_relative = relative.transform(test_df)
             test_features = test_features.merge(test_relative, on=ID_COLUMN, how="left", validate="one_to_one")
         feature_names = feature_names + relative.feature_names_
-    elif stage == "b2":
+    elif stage in {"b2", "s5"}:
         # B1 business features (same as s3)
         train_business, business_feature_names = build_b1_business_features(train_df)
         valid_business, _ = build_b1_business_features(valid_df)
