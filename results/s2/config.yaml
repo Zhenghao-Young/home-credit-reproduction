@@ -1,4 +1,4 @@
-data_dir: home-credit-default-risk
+data_dir: data/original
 train_file: application_train.csv
 test_file: application_test.csv
 folds_file: data/folds.csv
@@ -23,7 +23,7 @@ lightgbm:
 
 logistic:
   penalty: l2
-  solver: liblinear
+  solver: newton-cholesky
   max_iter: 1000
   class_weight: balanced
   random_state: 2026
