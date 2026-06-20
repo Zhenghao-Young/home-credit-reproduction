@@ -12,7 +12,7 @@
 ## 全局里程碑
 
 - [x] M1：S1 基线使用固定 folds 完整跑通，并能计算 OOF AUC。
-- [~] M2：RQ1 进行中，S1、S2、B1、S3 结果已可比较，待生成 RQ1 表图和报告第 3 章。
+- [x] M2：RQ1 完成，S1、S2、B1、S3 结果可比较，RQ1 表图与报告第 3 章已完成。
 - [ ] M3：RQ2 完成，S4、B2、S5 结果可比较。
 - [ ] M4：RQ3 完成，包含简单平均和 Logistic stacking。
 - [~] M5：最终报告在 `report/` 中编译完成。
@@ -43,7 +43,7 @@
 - [x] 运行 S3。
 - [x] 生成 `results/rq1/rq1_results.csv`。
 - [x] 生成 `results/rq1/rq1_gain_tree.png`。
-- [ ] 起草报告第 3 章。
+- [x] 起草报告第 3 章。
 
 当前已完成结果：
 
@@ -51,6 +51,7 @@
 | --- | --- | --- | --- |
 | S1 | LightGBM | 0.757646 | 78 |
 | S2 | LightGBM | 0.757405 | 379 |
+| S2-full | LightGBM | 0.760329 | 801 |
 | S2-Logistic | Logistic Regression | 0.743054 | 379 |
 | B1 | LightGBM | 0.768159 | 85 |
 | S3 | LightGBM | 0.785109 | 126 |
@@ -60,6 +61,7 @@ RQ1 当前关键增量：
 - B1 − S1 = +0.010513
 - S3 − B1 = +0.016950
 - S2 − S1 = -0.000241
+- S2-full − S1 = +0.002683（诊断性结果，包含 group-difference 特征）
 
 ## Member C：RQ2
 

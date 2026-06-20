@@ -18,9 +18,9 @@
 | --- | --- |
 | 数据 | 原始 Kaggle 数据放在 `data/original/`，该目录已被 Git 忽略；固定折划分为 `data/folds.csv`。 |
 | 代码 | `src/` 下已有固定折、指标校验、训练入口、S1/S2 application 特征、B1 业务特征和 S3 历史表基础聚合。 |
-| 结果 | 已有 `results/s1/`、`results/s2/`、`results/s2_full/`、`results/s2_logistic/`、`results/b1/`、`results/s3/`，项目汇总见 `results/summary.csv`。 |
+| 结果 | 已有 `results/s1/`、`results/s2/`、`results/s2_full/`、`results/s2_logistic/`、`results/b1/`、`results/s3/` 和 `results/rq1/`，项目汇总见 `results/summary.csv`。 |
 | 参考实现 | `open-solution/` 是上游解答 submodule，只读参考，不在其中改代码。 |
-| 报告 | `report/draft_report.tex` 和 `report/draft_report.pdf` 已包含前两章草稿。 |
+| 报告 | `report/draft_report.tex` 和 `report/draft_report.pdf` 已包含第 1--3 章草稿，其中第 3 章完成 RQ1 分析。 |
 
 旧的 `home-credit-default-risk/` 数据占位目录已废弃；当前默认数据入口是 `data/original/`。
 

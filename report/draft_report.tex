@@ -1,13 +1,20 @@
-\documentclass[11pt]{report}
+\documentclass[11pt,UTF8,fontset=windows]{ctexrep}
 
 \usepackage[a4paper,margin=1in]{geometry}
 \usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
 
-\title{Controlled Reproduction of the Home Credit Open Solution}
-\author{Industrial Data Analytics Project}
+% 允许在 CJK 段落中为不可断开的等宽英文标识符留出伸缩空间，避免溢出页边
+\emergencystretch=3em
+
+\title{Home Credit Open Solution 的受控复现\\[4pt]
+\large 性能增益来自特征表示、动态行为，还是模型集成？}
+\author{工业数据分析课程项目}
 \date{\today}
 
 \begin{document}
@@ -16,62 +23,83 @@
 \clearpage
 \pagenumbering{arabic}
 
-\chapter{Problem Setting and Research Questions}
+\chapter{问题背景与研究问题}
 
-\section{Task Background}
+\section{任务背景}
 
-The Home Credit Default Risk task asks whether a loan applicant will have repayment difficulty. Each applicant is identified by \texttt{SK\_ID\_CURR}, and the binary target \texttt{TARGET} equals 1 for applicants with repayment difficulty. The official evaluation metric is the area under the ROC curve (AUC), which measures whether risky applicants receive higher predicted probabilities than non-risky applicants.
+Home Credit Default Risk 任务要回答的问题是：一名贷款申请人是否会出现还款困难。每名申请人由
+\texttt{SK\_ID\_CURR} 唯一标识，二元标签 \texttt{TARGET} 在出现还款困难时取 1。官方评价指标是 ROC
+曲线下面积（AUC），它衡量的是模型是否给高风险申请人赋予了更高的预测概率——也就是模型对“风险高低”的
+排序能力，而非某个固定阈值下的准确率。
 
-The data are relational rather than a single flat table. The central application table contains one row per applicant, while the remaining tables describe credit bureau records, previous applications, installments, point-of-sale cash loans, and credit card behavior. The main modeling challenge is therefore not only fitting a classifier, but also transforming variable-length historical records into applicant-level features.
+这份数据并不是一张扁平的单表，而是一组关系型表格。中心的 application 表每名申请人占一行；其余表则分别
+记录征信局（bureau）历史、历史贷款申请（previous application）、分期还款（installments）、POS 与现金贷款
+（POS cash），以及信用卡（credit card）行为。因此，本任务的核心建模难点不只是“训练一个分类器”，更在于
+\textbf{如何把变长的历史记录转化为申请人级别的特征}。这一步“表示构造”决定了模型最终能够“看到”哪些信息。
 
-\section{Open Solution Development Path}
+\section{Open Solution 的演化路径}
 
-The open-source Home Credit solution evolved through six named versions. The versions are useful for understanding the modeling logic, but they cannot be compared directly as controlled experiments because feature engineering, cleaning rules, models, and parameters changed at the same time.
+开源的 Home Credit 解答先后经历了六个有名称的版本。这些版本对理解建模逻辑很有价值，但它们\textbf{不能}
+被直接当作受控实验来比较：因为在相邻两个版本之间，特征工程、清洗规则、模型类别与超参数往往同时发生了变化，
+分数的提升无法干净地归因到某一处改动。
 
 \begin{table}[h]
 \centering
-\caption{Historical open-solution stages used as the project reference.}
-\begin{tabular}{p{0.18\linewidth}p{0.36\linewidth}p{0.34\linewidth}}
+\caption{作为项目参照的历史 Open Solution 版本。}
+\label{tab:open-solution}
+\begin{tabular}{p{0.17\linewidth}p{0.35\linewidth}p{0.33\linewidth}}
 \toprule
-Version & Main change & Role in this project \\
+版本 & 主要变化 & 在本项目中的角色 \\
 \midrule
-Chestnut & Application-table baseline & S1 baseline \\
-Seedling & Application group aggregations and more models & S2 group aggregation \\
-Blossom & Historical-table aggregates & S3 historical information \\
-Tulip & Relative group features and recent behavior & S4 refined representation \\
-Sunflower & Cleaning fixes and dynamic features & B2/S5 cleaning and dynamics \\
-Four Leaf Clover & Stacking over OOF predictions & S6 ensemble \\
+Chestnut & application 单表基线 & S1 基线 \\
+Seedling & application 群组聚合与更多模型 & S2 群组聚合 \\
+Blossom & 多张历史表的聚合特征 & S3 历史信息 \\
+Tulip & 群体相对特征与近期行为 & S4 更精细的表示 \\
+Sunflower & 清洗修复与动态特征 & B2/S5 清洗与动态 \\
+Four Leaf Clover & 在 OOF 预测上做 stacking & S6 模型集成 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The central project question is: when the open solution improves, which added information structure is responsible for the gain? We do not attempt to reproduce every original feature exactly. Instead, we build a controlled reproduction that turns on one feature block at a time while holding the cross-validation split and LightGBM configuration fixed.
+本项目的核心问题是：当开源解答的分数提升时，究竟是\textbf{哪一类新增的信息结构}带来了增益？我们并不试图
+逐列精确复刻原方案的全部特征，而是构建一个\textbf{受控复现}：在固定交叉验证划分与固定 LightGBM 配置的前提下，
+每个阶段只“打开”一个新的特征块，从而把增益归因到具体的机制上。
 
-\section{Research Questions}
+\section{研究问题}
 
-The report is organized around three research questions.
+报告围绕三个研究问题（Research Question, RQ）组织。
 
-\textbf{RQ1: What explains the early gain from Chestnut to Blossom?} We separate three candidate sources: generic application-table group aggregations, hand-crafted application ratios, and historical-table aggregates.
+\textbf{RQ1：从 Chestnut 到 Blossom 的早期增益来自哪里？} 我们把候选来源拆成三类：通用的 application
+群组聚合、手工构造的 application 业务比例，以及多张历史表的聚合特征。
 
-\textbf{RQ2: What explains the later gain from Blossom to Sunflower?} We examine relative position within a peer group, recent repayment or application behavior, cleaning before aggregation, and short-term versus long-term dynamics.
+\textbf{RQ2：从 Blossom 到 Sunflower 的后期增益来自哪里？} 我们考察相对同类人群的位置、近期的还款或申请
+行为、聚合之前是否正确清洗，以及短期相对长期的动态变化。
 
-\textbf{RQ3: Why can stacking still improve after feature engineering?} We use out-of-fold predictions to test whether models trained on different feature blocks make sufficiently different errors for a second-level model to exploit.
+\textbf{RQ3：在充分的特征工程之后，stacking 为什么还能继续提升？} 我们利用各一级模型的折外（out-of-fold,
+OOF）预测，检验在不同特征块上训练出来的模型是否犯了足够不同的错误，从而让二层模型能够加以利用。
 
-\section{Working Hypothesis}
+\section{工作假设}
 
-Our working hypothesis is that the largest performance gains should come from relational and temporal feature representations rather than from model selection alone. Group aggregations may help, but they are expected to be weaker than historical-table features and dynamic behavior features. Stacking is expected to provide a smaller marginal gain because strong first-level models are likely to share many of the same risk signals.
+我们的工作假设是：最大的性能增益应当来自\textbf{关系型与时序型的特征表示}，而不是单纯的模型选择。群组聚合
+可能有帮助，但预计弱于历史表特征与动态行为特征；stacking 预计只带来较小的边际增益，因为表现强的一级模型
+很可能共享了大量相同的风险信号。后续各章将用受控对比逐一检验这一假设。
 
-\chapter{Controlled Reproduction Design}
+\chapter{受控复现设计}
 
-\section{Why Controlled Reproduction Is Needed}
+\section{为什么需要受控复现}
 
-The original version history is not a clean ablation study. A higher score in a later version may be caused by more features, different cleaning, different model classes, different hyperparameters, or stacking. To make the comparison interpretable, we fix the experimental infrastructure and change only the feature block associated with each stage.
+原始的版本历史并不是一项干净的消融实验。某个较晚版本之所以分数更高，可能源于更多特征、不同清洗、不同模型
+类别、不同超参数，或者 stacking 中的任意组合。为了让比较可解释，我们固定整套实验基础设施，每个阶段只改变
+与该阶段对应的那个特征块。
 
-All main LightGBM stages use the same five stratified folds, the same model parameters, and the same output format. The fold assignment is stored in \texttt{data/folds.csv}; later training commands only read this file and do not create new random splits.
+所有主线 LightGBM 阶段都使用\textbf{相同的五折分层划分}、\textbf{相同的模型参数}与\textbf{相同的输出格式}。
+折划分存储在 \texttt{data/folds.csv} 中；后续训练命令只读取该文件，绝不重新进行随机切分。这保证了 AUC 的
+变化主要反映新增特征的作用，而不是划分或调参的噪声。
 
-\section{Evaluation Protocol}
+\section{评价协议}
 
-The primary metric is out-of-fold AUC. For each fold, the model is trained on four folds and predicts the held-out fold. Concatenating the five validation predictions gives one prediction for every training applicant:
+主指标是\textbf{折外 AUC（OOF AUC）}。对每一折，模型在其余四折上训练，并对留出的这一折做预测。把五折的
+验证预测拼接起来，就得到了每名训练申请人各一条预测：
 
 \[
 \text{OOF} =
@@ -80,78 +108,111 @@ The primary metric is out-of-fold AUC. For each fold, the model is trained on fo
 \right\}_{i=1}^{n}.
 \]
 
-The OOF AUC is then computed over the full training set. This is preferred over training-set AUC because each prediction is made by a model that did not train on that applicant. We also report the mean and standard deviation of the five fold AUC values.
+随后在整个训练集上计算 OOF AUC。相比训练集 AUC，这一指标更可靠，因为每条预测都来自一个\textbf{没有见过
+该申请人}的模型。我们同时汇报五个折 AUC 的均值与标准差，用以衡量增益的稳定性。
 
-\section{Experiment Matrix}
+我们对每个配对对比 $A\to B$ 还记录 OOF AUC 的差值
+\(
+\Delta_{A\to B}=\operatorname{AUC}_{\mathrm{OOF}}(B)-\operatorname{AUC}_{\mathrm{OOF}}(A)
+\)
+以及五折上的逐折配对差值。我们不做复杂的显著性检验，而采用一个预先规定的描述性判据：
+
+\begin{quote}
+平均增益为正，且至少 4 个折方向一致，称为“稳定增益”；否则称为“不稳定或证据不足”。
+\end{quote}
+
+\section{实验矩阵}
 
 \begin{table}[h]
 \centering
-\caption{Controlled feature stages.}
+\caption{受控特征阶段。}
+\label{tab:matrix}
 \begin{tabular}{lll}
 \toprule
-Stage & Feature content & Purpose \\
+阶段 & 特征内容 & 目的 \\
 \midrule
-S1 & Application numerical and categorical features & Baseline \\
-S2 & S1 + application group aggregation values & Generic group aggregation \\
-B1 & S1 + business ratios and \texttt{EXT\_SOURCE} summaries & Application business features \\
-S3 & B1 + basic historical-table aggregates & Historical information \\
-S4 & S3 + relative group position and recent windows & Refined representation \\
-B2 & S4 with cleaning before aggregation & Cleaning-order effect \\
-S5 & B2 + short/long ratios and trend features & Dynamic behavior \\
-S6 & Stacking over first-level OOF predictions & Prediction complementarity \\
+S1 & application 数值与类别特征 & 基线 \\
+S2 & S1 + application 群组聚合原值 & 通用群组聚合 \\
+B1 & S1 + 业务比例与 \texttt{EXT\_SOURCE} 汇总 & application 业务特征 \\
+S3 & B1 + 五张历史表的基础聚合 & 历史信息 \\
+S4 & S3 + 群体相对位置与近期窗口 & 更精细的表示 \\
+B2 & S4，但在聚合之前清洗 & 清洗顺序的影响 \\
+S5 & B2 + 短期/长期比值与趋势特征 & 动态行为 \\
+S6 & 在一级 OOF 预测上做 stacking & 预测互补性 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{S1 Baseline}
+本章只详细说明已经完成的 S1、S2 及其 Logistic 桥接；B1、S3 将在第~\ref{chap:rq1} 章随 RQ1 一并展开，
+S4--S6 属于后续 RQ2、RQ3 的内容。
 
-S1 uses only the application table. Numerical and categorical columns follow the original project's \texttt{NUMERICAL\_COLUMNS} and \texttt{CATEGORICAL\_COLUMNS}. The identifier \texttt{SK\_ID\_CURR} and target \texttt{TARGET} are not model features. Several known abnormal codes are converted to missing values, including \texttt{DAYS\_EMPLOYED=365243}, \texttt{CODE\_GENDER=XNA}, \texttt{NAME\_FAMILY\_STATUS=Unknown}, \texttt{ORGANIZATION\_TYPE=XNA}, and \texttt{DAYS\_LAST\_PHONE\_CHANGE=0}.
+\section{S1 基线}
 
-S1 deliberately excludes ratios, group aggregations, historical-table features, and dynamic windows. It provides the reference point for measuring the effect of later feature blocks.
+S1 只使用 application 表。数值列与类别列遵循原项目的 \texttt{NUMERICAL\_COLUMNS} 与
+\texttt{CATEGORICAL\_COLUMNS}。标识符 \texttt{SK\_ID\_CURR} 与标签 \texttt{TARGET} 不作为模型特征。若干已知的
+异常编码被转为缺失值，包括 \texttt{DAYS\_EMPLOYED=365243}、\texttt{CODE\_GENDER=XNA}、
+\texttt{NAME\_FAMILY\_STATUS=Unknown}、\texttt{ORGANIZATION\_TYPE=XNA} 以及
+\texttt{DAYS\_LAST\_PHONE\_CHANGE=0}。
 
-\section{S2 Application Group Aggregations}
+S1 刻意排除了比例特征、群组聚合、历史表特征与动态窗口。它提供了衡量后续特征块作用的参照点。
 
-S2 adds fold-safe application-table group aggregation values to S1. The current controlled S2 uses the repository's \texttt{FULL\_GROUPBY\_SPECS}: 301 group aggregation features plus the 78 S1 features, for 379 total features.
+\section{S2 application 群组聚合}
 
-The aggregation values include \texttt{min}, \texttt{mean}, \texttt{max}, \texttt{sum}, \texttt{var}, and \texttt{median} over core application variables such as credit amount, annuity, income, goods price, external scores, age-related day counts, family counts, and car age. The main group keys include education by gender, family status by education, and family status by gender, together with several more specific occupational and regional combinations.
+S2 在 S1 之上加入 fold-safe 的 application 群组聚合原值。当前受控版本的 S2 使用仓库中的
+\texttt{FULL\_GROUPBY\_SPECS}：301 个群组聚合特征，加上 S1 的 78 个基础特征，共计 379 个特征。
 
-S2 only keeps the group aggregation values. It does not create difference features such as $x-\overline{x}_{g(i)}$ or absolute difference features. Those are reserved for the later S4 relative-position experiment.
+聚合原值在若干核心 application 变量上计算，包括贷款金额、年金、收入、商品价格、外部评分、与年龄相关的天数
+计数、家庭人数与车龄等；聚合函数为 \texttt{min}、\texttt{mean}、\texttt{max}、\texttt{sum}、\texttt{var}、
+\texttt{median}。主要的分组键包括“学历$\times$性别”“家庭状况$\times$学历”“家庭状况$\times$性别”，以及若干更
+具体的职业与地区组合。
 
-\section{Fold-Safe Groupby Rule}
+S2 只保留群组聚合\textbf{原值}，不构造形如 $x-\overline{x}_{g(i)}$ 的差值特征或绝对差值特征。这些差值特征被
+保留到后续 S4 的群体相对位置实验中。
 
-Every group aggregation is fitted inside the current training fold only. For a validation or test applicant, the fitted group table is used as a lookup table. If the validation or test group was not observed in the training fold, the feature is filled with the training-fold global mean of that aggregation. The target is never used in groupby construction.
+\section{fold-safe 群组聚合规则}
 
-This rule avoids leakage: validation rows never contribute to the statistics used to predict themselves.
+每个群组聚合都只在\textbf{当前训练折}内拟合。对验证折或测试集的申请人，已拟合的群组聚合表只作为一张查找表
+使用。若验证折或测试集中出现的某个 group 在训练折内未曾出现，则该特征用训练折上该聚合的全局均值填补。构造
+群组聚合时绝不使用标签。
 
-\section{S2 Logistic Bridge}
+这条规则避免了泄漏：验证行永远不会参与生成用于预测它自身的统计量。任何与折相关的统计（群组均值、编码器、
+标准化等）都遵循同样的“先在训练折 \texttt{fit}、再分别 \texttt{transform}”模式。
 
-To test whether the Seedling-style feature space benefits specifically from nonlinear tree models, we also train an $L_2$-regularized Logistic Regression on the same 379 S2 features. Numerical variables are median-imputed and standardized within the training fold. Categorical variables are one-hot encoded with unseen categories ignored at transform time. This model is not the main S2 result; it is a bridge experiment and a possible input to the later stacking stage.
+\section{S2 Logistic 桥接}
 
-\section{Current Member A Results}
+为了检验 Seedling 式的特征空间是否特别依赖非线性树模型，我们在同一套 379 维 S2 特征上额外训练了一个带
+$L_2$ 正则的 Logistic 回归。数值变量在训练折内做中位数填补与标准化；类别变量做 one-hot 编码，转换时忽略未见
+类别。该模型不是 S2 的主结果，而是一个桥接实验，同时也是后续 stacking 阶段可能的输入。
 
-Table~\ref{tab:member-a-results} summarizes the current Member A outputs. S2 uses the 379-feature controlled group aggregation version. S2-full is a separate diagnostic run that also includes group-difference features and is therefore not the single official S2 stage.
+\section{当前 Member A 结果}
+
+表~\ref{tab:member-a-results} 汇总了当前 Member A 的产出。S2 是 379 维的受控群组聚合版本；S2-full 则是一个
+单独的诊断性运行，它额外包含了群组差值特征，因此\textbf{不是}唯一的官方 S2 阶段。
 
 \begin{table}[h]
 \centering
-\caption{Current Member A controlled reproduction results.}
+\caption{当前 Member A 受控复现结果。}
 \label{tab:member-a-results}
 \begin{tabular}{lrrrr}
 \toprule
-Stage & Model & Features & OOF AUC & Fold AUC std \\
+阶段 & 模型 & 特征数 & OOF AUC & 折 AUC 标准差 \\
 \midrule
 S1 & LightGBM & 78 & 0.757646 & 0.002460 \\
 S2 & LightGBM & 379 & 0.757405 & 0.002358 \\
 S2-full & LightGBM & 801 & 0.760329 & 0.002746 \\
-S2-Logistic & Logistic & 379 & 0.742940 & 0.003648 \\
+S2-Logistic & Logistic & 379 & 0.743054 & 0.003636 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The controlled S2 stage does not improve over S1 in OOF AUC. This suggests that simply adding application-table group aggregation values is not sufficient to reproduce the stronger gain observed in the original Seedling history. In contrast, S2-full improves the OOF AUC, indicating that the larger original-style feature block, especially group-relative difference features, carries additional signal. This distinction is important for the later report: S2 should be interpreted as the controlled group-aggregation test, while S2-full is evidence about what is lost when the relative-position part is removed.
+受控的 S2 阶段在 OOF AUC 上并未超过 S1。这说明，仅仅加入 application 群组聚合\textbf{原值}，不足以复现原始
+Seedling 历史中所观察到的较强增益。与之相对，S2-full 提升了 OOF AUC，表明更大的原始风格特征块——特别是其中
+的群组\textbf{相对差值}特征——携带了额外信号。这一区分对后文很重要：S2 应被理解为“通用群组聚合”的受控检验，
+而 S2-full 则是“移除相对位置部分会损失什么”的证据。
 
-\section{Reproducibility Artifacts}
+\section{可复现产物}
 
-Each stage writes the same four core artifacts:
+每个阶段都写出相同的四个核心产物：
 
 \begin{verbatim}
 results/<stage>/oof.parquet
@@ -160,6 +221,202 @@ results/<stage>/feature_names.txt
 results/<stage>/config.yaml
 \end{verbatim}
 
-The OOF file contains \texttt{SK\_ID\_CURR}, \texttt{TARGET}, \texttt{fold\_id}, and \texttt{prediction}. The implementation validates that every training applicant appears exactly once, that predictions are finite probabilities in $[0,1]$, and that fold identifiers match \texttt{data/folds.csv}.
+OOF 文件包含 \texttt{SK\_ID\_CURR}、\texttt{TARGET}、\texttt{fold\_id} 与 \texttt{prediction}。实现会校验：每名
+训练申请人恰好出现一次、预测为 $[0,1]$ 内的有限概率、且折标识与 \texttt{data/folds.csv} 完全一致。
+
+\chapter{RQ1：从基础特征到关系型表示}
+\label{chap:rq1}
+
+\section{本章目标}
+
+RQ1 关心的是 Open Solution 早期（Chestnut $\to$ Blossom）那一大段增益究竟来自何处。借助受控复现，我们把这段
+历史拆成四组可比的对比，每一组只隔离一个机制：
+
+\begin{itemize}
+\item \textbf{S2 $-$ S1}：通用 application 群组聚合原值的价值；
+\item \textbf{B1 $-$ S1}：业务比例与 \texttt{EXT\_SOURCE} 汇总的价值；
+\item \textbf{S3 $-$ B1}：五张历史表基础聚合的价值；
+\item \textbf{S2-LGBM $-$ S2-Logistic}：同一特征空间下，树模型非线性带来的额外价值。
+\end{itemize}
+
+其中 B1 是一个\textbf{桥接实验}：它仍只使用 application 单表，但加入了 Blossom 中最核心的少量手工特征——三个
+业务比例
+\[
+\frac{\text{AMT\_ANNUITY}}{\text{AMT\_INCOME\_TOTAL}},\quad
+\frac{\text{AMT\_CREDIT}}{\text{AMT\_INCOME\_TOTAL}},\quad
+\frac{\text{AMT\_CREDIT}}{\text{AMT\_ANNUITY}},
+\]
+以及 \texttt{EXT\_SOURCE\_1/2/3} 的 \texttt{mean}、\texttt{min}、\texttt{max}、\texttt{std} 共四个汇总。S3 则在
+B1 之上再接入 bureau、previous application、installments、POS cash、credit card 五张历史表的基础聚合。B1 把
+“业务比例”从“多表历史”中干净地剥离出来，使我们能分别度量两者的贡献。
+
+\section{结果总览}
+
+表~\ref{tab:rq1-stages} 给出 RQ1 涉及各阶段的规模与 OOF AUC，表~\ref{tab:rq1-deltas} 给出四组受控配对对比。
+
+\begin{table}[h]
+\centering
+\caption{RQ1 各阶段的 OOF AUC 与规模。}
+\label{tab:rq1-stages}
+\begin{tabular}{llrrr}
+\toprule
+阶段 & 模型 & 特征数 & OOF AUC & 折 AUC 标准差 \\
+\midrule
+S1 & LightGBM & 78 & 0.757646 & 0.002460 \\
+S2 & LightGBM & 379 & 0.757405 & 0.002358 \\
+S2-full & LightGBM & 801 & 0.760329 & 0.002746 \\
+S2-Logistic & Logistic & 379 & 0.743054 & 0.003636 \\
+B1 & LightGBM & 85 & 0.768159 & 0.001864 \\
+S3 & LightGBM & 126 & 0.785109 & 0.001543 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{RQ1 受控配对对比（$\Delta$ 为 OOF AUC 差值，同向折数为五折中差值为正的折数）。}
+\label{tab:rq1-deltas}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l p{0.24\linewidth} r c p{0.14\linewidth}}
+\toprule
+对比 & 含义 & $\Delta$OOF AUC & 同向折数 & 稳定性 \\
+\midrule
+S2 $-$ S1 & 普通群组聚合原值 & $-0.000241$ & 1/5 & 不稳定/证据不足 \\
+B1 $-$ S1 & 业务比例 + \texttt{EXT\_SOURCE} 汇总 & $+0.010513$ & 5/5 & 稳定增益 \\
+S3 $-$ B1 & 五张历史表的基础聚合 & $+0.016950$ & 5/5 & 稳定增益 \\
+S2-LGBM $-$ S2-Logistic & 同特征空间的树非线性 & $+0.014350$ & 5/5 & 稳定增益 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+图~\ref{fig:gain-tree} 把前三组特征侧的对比画成一棵增益树：从 S1 出发，一条分支通向通用群组聚合 S2，另一条
+分支通向业务特征 B1，再由 B1 接入多表历史 S3。每条箭头标注了对应的 $\Delta$OOF AUC 与稳定性判定。
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,inner sep=6pt,font=\small},
+  arr/.style={-{Stealth[length=2.6mm]},thick}
+]
+\node[box,fill=gray!12]   (s1) at (0,0)      {S1\\AUC 0.757646};
+\node[box,fill=blue!8]    (s2) at (5.0,1.7)  {S2\\AUC 0.757405};
+\node[box,fill=yellow!18] (b1) at (5.0,-1.7) {B1\\AUC 0.768159};
+\node[box,fill=green!14]  (s3) at (10.0,-1.7){S3\\AUC 0.785109};
+\draw[arr] (s1) -- (s2)
+  node[midway,above,sloped,font=\footnotesize]{$\Delta=-0.000241$（不稳定）};
+\draw[arr] (s1) -- (b1)
+  node[midway,below,sloped,font=\footnotesize]{$\Delta=+0.010513$（稳定）};
+\draw[arr] (b1) -- (s3)
+  node[midway,above,font=\footnotesize]{$\Delta=+0.016950$（稳定）};
+\end{tikzpicture}
+\caption{RQ1 的 OOF AUC 增益树。最大的稳定增益来自多表历史聚合（S3 $-$ B1），业务比例与
+\texttt{EXT\_SOURCE} 汇总（B1 $-$ S1）次之，而普通群组聚合（S2 $-$ S1）几乎没有贡献。}
+\label{fig:gain-tree}
+\end{figure}
+
+\section{增益归因分析}
+
+\subsection{普通群组聚合为何几乎无效}
+
+S2 相对 S1 的 OOF AUC 变化为 $-0.000241$，五折中只有 1 折方向为正，按判据属于“不稳定/证据不足”。这是一个
+值得认真对待的负结果，而非实现疏漏。
+
+一个自洽的机制解释是：受控的 S2 只加入了群组聚合\textbf{原值}（如某个学历$\times$性别群体的收入均值）。这类
+特征与底层个体变量高度共线，且分辨率更低——它对群体内的所有个体取同一个值。对于 LightGBM 而言，模型本就能
+直接在底层变量（如 \texttt{AMT\_INCOME\_TOTAL}）上做分裂，群组均值很难提供新的、可分裂的信息；在
+\texttt{feature\_fraction=0.20} 的列采样下，大量这类低信息特征甚至会稀释每棵树能采到有效特征的概率。
+
+与之形成对照的是诊断性的 S2-full：它在群组聚合之外还加入了群组\textbf{差值}特征，OOF AUC 相对 S1 提升约
+$+0.0027$。这说明信号其实并不在“群体的绝对统计量”里，而在“个人值相对群体均值的\textbf{相对位置}”
+$x_i-\overline{x}_{g(i)}$ 上。这也正是项目计划把差值特征留到 S4（群体相对位置实验）的原因：把“聚合原值”与
+“相对位置”分开，才能避免把后者的功劳错记到前者头上。
+
+\subsection{业务比例与 EXT\_SOURCE 的高效率}
+
+B1 相对 S1 取得 $+0.010513$ 的稳定增益（五折全部为正），而它\textbf{只新增了 7 个特征}。从信息密度看，这是
+RQ1 中单位特征贡献最高的特征块（见表~\ref{tab:rq1-density}）。
+
+之所以如此高效，可以从两类特征各自的语义来理解。其一，\texttt{EXT\_SOURCE\_1/2/3} 是外部征信机构给出的、
+已经“预消化”的风险评分；它们本身就是别处模型的输出，浓缩了大量我们在 application 表里看不到的外部信息。对它们
+取 \texttt{mean}/\texttt{min}/\texttt{max} 捕捉了多个来源的“共识水平”，而 \texttt{std} 捕捉了来源之间的“分歧
+程度”——当几个外部评分互相矛盾时，往往本身就是一种风险信号。其二，三个业务比例把“能否负担得起这笔贷款”
+显式地表达出来：年金/收入与贷款/收入刻画偿债压力，贷款/年金近似刻画还款期限结构。这些都是树模型即便拿到原始
+分子分母，也未必能自行高效构造出来的比值关系。
+
+\subsection{多表历史聚合带来最大的绝对增益}
+
+S3 相对 B1 取得 $+0.016950$ 的稳定增益（五折全部为正），是 RQ1 中\textbf{绝对增益最大}的一步，新增 41 个特征。
+
+机制上，历史表提供的是\textbf{直接的行为证据}，与 application 的静态快照互补：bureau 的
+\texttt{bureau\_amt\_credit\_sum\_debt}（在外负债规模）与 \texttt{bureau\_active\_loan\_ratio}（活跃贷款比例）
+刻画现有负债负担；installments 的 \texttt{installments\_overdue\_ratio} 与平均逾期天数刻画历史还款纪律；
+previous application 的 \texttt{previous\_approved\_ratio} 则反映此人过往被金融机构接受的程度。这些“此人过去
+怎么还钱”的信息，是任何单表静态字段都无法替代的。
+
+更重要的是，把这些变长历史记录聚合到 \texttt{SK\_ID\_CURR} 粒度，本身就是本题\textbf{最关键的表示步骤}。每名
+申请人在 installments 表里可能有几十上百条记录，模型无法直接消费；只有先按申请人聚合成“逾期比例”“平均
+少还金额”等申请人级统计量，这些行为信息才进入了模型可学习的特征空间。S3 的大幅增益，本质上是“把关系型历史
+转化为申请人级表示”这一动作的回报。
+
+\subsection{特征轴与模型轴：树非线性的作用}
+
+最后一组对比 S2-LGBM $-$ S2-Logistic 给出 $+0.014350$ 的稳定增益。它衡量的是：在\textbf{完全相同}的 379 维
+S2 特征空间下，把线性模型换成 LightGBM 能多拿多少。这个量级与 B1、S3 的特征块增益相当，说明“模型非线性”确实
+是一个真实而显著的杠杆。
+
+但需要强调，这是一个\textbf{模型轴}上的结果，与 RQ1 关心的\textbf{特征轴}问题正交，因此不应与特征块增益直接
+相加。一个有启发的旁证是：在更丰富的 379 维特征上，Logistic 的 OOF AUC 仅为 0.743054，仍低于在 78 维原始特征
+上的树模型 S1（0.757646）。换言之，“好模型 + 对线性不友好的特征”不一定胜过“树模型 + 朴素特征”。这提示我们：
+特征表示与模型能力是两个不同的维度，本报告的主线刻意固定模型、只改特征，正是为了把特征表示的贡献单独量化
+出来。
+
+\subsection{信息密度与跨折稳定性}
+
+把增益除以新增特征数，可以得到一个粗略但有说服力的“信息密度”视角（表~\ref{tab:rq1-density}）。B1 以约
+$1.5\times10^{-3}$/特征 的效率领先，S3 次之，而普通群组聚合接近于零甚至为负。这支持一个朴素但重要的判断：
+\textbf{表示质量比特征数量更重要}——301 个低信息聚合原值，抵不过 7 个语义明确的业务特征。
+
+\begin{table}[h]
+\centering
+\caption{各特征块的信息密度（OOF AUC 增益 $\div$ 新增特征数）。}
+\label{tab:rq1-density}
+\begin{tabular}{lrrr}
+\toprule
+特征块 & 新增特征数 & $\Delta$OOF AUC & 每特征增益 \\
+\midrule
+S2 普通群组聚合 & 301 & $-0.000241$ & $\approx 0$ \\
+B1 业务比例 + \texttt{EXT\_SOURCE} & 7 & $+0.010513$ & $+1.50\times10^{-3}$ \\
+S3 多表历史聚合 & 41 & $+0.016950$ & $+4.13\times10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+另一个容易被忽视的现象是\textbf{跨折方差}的下降：折 AUC 标准差从 S1 的 0.002460 降到 B1 的 0.001864，再降到
+S3 的 0.001543。也就是说，有价值的特征不仅抬升了 OOF AUC 的均值，还压低了它在五折之间的波动。这与“稳定增益”
+判据是一致的——B1 与 S3 都是五折全部同向，增益不依赖于某一折的偶然。
+
+\section{与原始 Open Solution 历史的对照}
+
+把上述结果放回原始版本历史，可以看到受控复现的价值。原始 Seedling（对应 S2 的思想）在公开榜上把分数从
+约 0.742 提升到约 0.747，但那一版是把“群组聚合 + 群组差值 + 更多模型”一并上线的。我们的受控 S2 单独只保留
+群组聚合原值，结果增益约为零。这恰好暴露了直接读“版本更新日志”的风险：Seedling 的提升被笼统地归功于
+“groupby 特征”，而受控对比表明，真正起作用的是被一同引入的相对差值与模型扩展，而非群组聚合原值本身。这正是
+B1（以及后续 B2）这类桥接实验的意义所在——把原本纠缠在一起的改动一一拆开，使“版本更新日志”变成可验证的
+统计学习证据。
+
+\section{本章结论}
+
+综合四组受控对比，RQ1 可以明确回答如下：
+
+\begin{quote}
+在受控复现下，Chestnut $\to$ Blossom 的早期增益\textbf{主要来自多表历史聚合}——S3 $-$ B1 贡献了最大的稳定
+OOF AUC 增益（$+0.016950$，五折全部同向）。\textbf{业务比例与 \texttt{EXT\_SOURCE} 汇总是高度参数高效的次要
+来源}（B1 $-$ S1 为 $+0.010513$，单位特征贡献最高）。相比之下，\textbf{普通的 application 群组聚合原值单独
+几乎没有贡献}（S2 $-$ S1 为 $-0.000241$，证据不足）。
+\end{quote}
+
+这一结论细化、并基本支持了第一章的工作假设：早期增益确实以关系型特征表示为主导，而非来自模型选择；其中
+“把变长历史聚合为申请人级表示”是最关键的一步。同时它也修正了一个常见的直觉——“多做 groupby 聚合就会更好”
+在本受控设置下并不成立，群组信息真正的价值要等到 S4 以\textbf{相对位置}的形式重新引入时才会显现。
 
 \end{document}

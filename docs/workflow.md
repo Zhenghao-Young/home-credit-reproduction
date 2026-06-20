@@ -169,6 +169,16 @@ conda run -n credit python -m src.train_cv \
   --predict-test
 ```
 
+S2-full：诊断性 application groupby 原始值 + 差值特征，不是唯一官方 S2 阶段：
+
+```bash
+conda run -n credit python -m src.train_cv \
+  --stage s2_full \
+  --model lightgbm \
+  --config configs/base_lgbm.yaml \
+  --predict-test
+```
+
 S2-Logistic：同一套 S2 特征上的 Logistic Regression：
 
 ```bash
@@ -292,8 +302,11 @@ report/draft_report.pdf
 
 ```bash
 cd report
-pdflatex -interaction=nonstopmode draft_report.tex
-pdflatex -interaction=nonstopmode draft_report.tex
+xelatex -interaction=nonstopmode draft_report.tex
+xelatex -interaction=nonstopmode draft_report.tex
 ```
+
+报告正文为中文，并使用 `ctexrep` 类和 `fontset=windows`，因此应使用
+XeLaTeX 编译，不要用 `pdflatex`。
 
 `report/` 目录只保留最终 tex、pdf 和必要图表。编译产生的 `.aux`、`.log`、`.out` 等辅助文件不要提交。
