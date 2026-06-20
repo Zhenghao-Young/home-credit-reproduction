@@ -179,6 +179,26 @@ conda run -n credit python -m src.train_cv \
   --predict-test
 ```
 
+B1：application 业务比例和 `EXT_SOURCE` 汇总：
+
+```bash
+conda run -n credit python -m src.train_cv \
+  --stage b1 \
+  --model lightgbm \
+  --config configs/b1.yaml \
+  --predict-test
+```
+
+S3：B1 加五张历史表基础聚合：
+
+```bash
+conda run -n credit python -m src.train_cv \
+  --stage s3 \
+  --model lightgbm \
+  --config configs/s3.yaml \
+  --predict-test
+```
+
 不用 Conda 时，把上述命令开头的 `conda run -n credit python` 替换为
 `.\.venv\Scripts\python.exe`，其余参数保持不变。
 
