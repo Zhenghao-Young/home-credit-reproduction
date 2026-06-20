@@ -225,7 +225,7 @@ src/stacking.py                        # S6
 快速查看已完成结果汇总：
 
 ```bash
-cat results/member_a_summary.csv
+cat results/summary.csv
 ```
 
 校验某个 OOF 文件：

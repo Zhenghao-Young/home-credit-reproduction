@@ -30,11 +30,12 @@ from src.features.application_groupby import (
     FULL_GROUPBY_SPECS,
     FoldSafeGroupbyAggregateDiffs,
 )
+from src.features.history_basic import build_s3_history_features
 from src.metrics import auc_score, build_fold_metrics, summarize_oof_auc, validate_oof
 from src.split import FOLD_COLUMN, load_folds
 
 
-SUPPORTED_STAGES = {"s1", "b1", "s2", "s2_full", "s2_logistic"}
+SUPPORTED_STAGES = {"s1", "b1", "s2", "s2_full", "s2_logistic", "s3"}
 SUPPORTED_MODELS = {"lightgbm", "logistic"}
 MISSING_CATEGORY = "__MISSING__"
 UNKNOWN_CATEGORY = "__UNKNOWN__"
@@ -80,21 +81,26 @@ def run_cv(stage: str, model_name: str, config_path: str | Path, predict_test: b
         raise ValueError(f"unsupported stage {stage!r}; expected one of {sorted(SUPPORTED_STAGES)}")
     if model_name not in SUPPORTED_MODELS:
         raise ValueError(f"unsupported model {model_name!r}; expected one of {sorted(SUPPORTED_MODELS)}")
-    if stage in {"s1", "b1"} and model_name != "lightgbm":
-        raise ValueError("S1 and B1 are only defined for LightGBM")
+    if stage in {"s1", "b1", "s3"} and model_name != "lightgbm":
+        raise ValueError("S1, B1, and S3 are only defined for LightGBM")
     if stage == "s2_logistic" and model_name != "logistic":
         raise ValueError("s2_logistic must use --model logistic")
     if stage in {"s2", "s2_full"} and model_name != "lightgbm":
         raise ValueError("S2 main experiments must use --model lightgbm")
 
     config = load_config(config_path)
-    train_path = Path(config["data_dir"]) / config["train_file"]
-    test_path = Path(config["data_dir"]) / config["test_file"]
-    sample_submission_path = Path(config["data_dir"]) / "sample_submission.csv"
+    data_dir = Path(config["data_dir"])
+    train_path = data_dir / config["train_file"]
+    test_path = data_dir / config["test_file"]
+    sample_submission_path = data_dir / "sample_submission.csv"
     folds = load_folds(config.get("folds_file", "data/folds.csv"))
     application = load_application_train(train_path)
     base_features, base_feature_names, base_categorical = build_s1_features(application)
     application_support = clean_application(application)
+    history_features = None
+    history_feature_names: list[str] = []
+    if stage == "s3":
+        history_features, history_feature_names = build_s3_history_features(data_dir)
     test_base_features = None
     test_support = None
     if predict_test:
@@ -129,6 +135,8 @@ def run_cv(stage: str, model_name: str, config_path: str | Path, predict_test: b
             test_df=None if test_base_features is None else _merge_support_columns(test_base_features, test_support),
             base_feature_names=base_feature_names,
             base_categorical=base_categorical,
+            history_features=history_features,
+            history_feature_names=history_feature_names,
         )
         final_feature_names = feature_names
 
@@ -189,7 +197,7 @@ def run_cv(stage: str, model_name: str, config_path: str | Path, predict_test: b
     fold_metrics.to_csv(output_dir / "fold_metrics.csv", index=False)
     (output_dir / "feature_names.txt").write_text("\n".join(final_feature_names or []) + "\n", encoding="utf-8")
     shutil.copyfile(config_path, output_dir / "config.yaml")
-    _update_member_a_summary(config, output_stage, model_name, fold_metrics, oof_auc, len(final_feature_names or []), output_dir)
+    _update_summary(config, output_stage, model_name, fold_metrics, oof_auc, len(final_feature_names or []), output_dir)
     if predict_test:
         submission = _build_submission(test_base_features, test_prediction_parts, sample_submission_path)
         submission_path = output_dir / "submission.csv"
@@ -204,6 +212,8 @@ def _build_fold_features(
     test_df: pd.DataFrame | None,
     base_feature_names: list[str],
     base_categorical: list[str],
+    history_features: pd.DataFrame | None = None,
+    history_feature_names: list[str] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame | None, list[str], list[str]]:
     train_features = train_df[[ID_COLUMN] + base_feature_names].copy()
     valid_features = valid_df[[ID_COLUMN] + base_feature_names].copy()
@@ -213,7 +223,7 @@ def _build_fold_features(
     feature_names = list(base_feature_names)
     categorical_columns = [col for col in base_categorical if col in feature_names]
 
-    if stage == "b1":
+    if stage in {"b1", "s3"}:
         train_business, business_feature_names = build_b1_business_features(train_df)
         valid_business, _ = build_b1_business_features(valid_df)
         train_features = train_features.merge(train_business, on=ID_COLUMN, how="left", validate="one_to_one")
@@ -222,6 +232,14 @@ def _build_fold_features(
             test_business, _ = build_b1_business_features(test_df)
             test_features = test_features.merge(test_business, on=ID_COLUMN, how="left", validate="one_to_one")
         feature_names = feature_names + business_feature_names
+        if stage == "s3":
+            if history_features is None or history_feature_names is None:
+                raise ValueError("S3 requires precomputed history features")
+            train_features = train_features.merge(history_features, on=ID_COLUMN, how="left", validate="many_to_one")
+            valid_features = valid_features.merge(history_features, on=ID_COLUMN, how="left", validate="many_to_one")
+            if test_features is not None:
+                test_features = test_features.merge(history_features, on=ID_COLUMN, how="left", validate="many_to_one")
+            feature_names = feature_names + list(history_feature_names)
     elif stage in {"s2", "s2_logistic"}:
         groupby = FoldSafeGroupbyAggregateDiffs(
             specs=FULL_GROUPBY_SPECS,
@@ -373,7 +391,7 @@ def _build_submission(
     return submission
 
 
-def _update_member_a_summary(
+def _update_summary(
     config: dict,
     stage: str,
     model_name: str,
@@ -382,7 +400,7 @@ def _update_member_a_summary(
     n_features: int,
     output_dir: Path,
 ) -> None:
-    summary_path = Path(config.get("results_dir", "results")) / "member_a_summary.csv"
+    summary_path = Path(config.get("results_dir", "results")) / "summary.csv"
     row = pd.DataFrame(
         [
             {
