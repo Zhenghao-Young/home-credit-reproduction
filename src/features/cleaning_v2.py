@@ -42,6 +42,10 @@ def clean_bureau(df: pd.DataFrame) -> pd.DataFrame:
         DAYS_CREDIT_ENDDATE  < -40000  -> NaN
         DAYS_CREDIT_UPDATE   < -40000  -> NaN
         DAYS_ENDDATE_FACT    < -40000  -> NaN
+
+    Additional data-driven rules (affect S3-aggregated columns):
+        AMT_CREDIT_SUM_DEBT  < 0         -> NaN   (8,418 rows; negative debt is a data error)
+        AMT_CREDIT_SUM       > 50 000 000 -> NaN   (44 rows; >5× p99.99 extreme outlier)
     """
     cleaned = df.copy()
     extreme_date_cols = [
@@ -52,6 +56,12 @@ def clean_bureau(df: pd.DataFrame) -> pd.DataFrame:
     for col in extreme_date_cols:
         if col in cleaned.columns:
             cleaned.loc[cleaned[col] < -40000, col] = np.nan
+
+    if "AMT_CREDIT_SUM_DEBT" in cleaned.columns:
+        cleaned.loc[cleaned["AMT_CREDIT_SUM_DEBT"] < 0, "AMT_CREDIT_SUM_DEBT"] = np.nan
+    if "AMT_CREDIT_SUM" in cleaned.columns:
+        cleaned.loc[cleaned["AMT_CREDIT_SUM"] > 50_000_000, "AMT_CREDIT_SUM"] = np.nan
+
     return cleaned
 
 
@@ -61,6 +71,9 @@ def clean_credit_card(df: pd.DataFrame) -> pd.DataFrame:
     Rules (from reproduction_plan.md §4.6):
         AMT_DRAWINGS_ATM_CURRENT  < 0  -> NaN
         AMT_DRAWINGS_CURRENT      < 0  -> NaN
+
+    Additional data-driven rules (affect S3-aggregated columns):
+        AMT_BALANCE  < -50 000  -> NaN   (26 rows; extreme negative balance is a data error)
     """
     cleaned = df.copy()
     negative_amt_cols = [
@@ -70,4 +83,8 @@ def clean_credit_card(df: pd.DataFrame) -> pd.DataFrame:
     for col in negative_amt_cols:
         if col in cleaned.columns:
             cleaned.loc[cleaned[col] < 0, col] = np.nan
+
+    if "AMT_BALANCE" in cleaned.columns:
+        cleaned.loc[cleaned["AMT_BALANCE"] < -50_000, "AMT_BALANCE"] = np.nan
+
     return cleaned
