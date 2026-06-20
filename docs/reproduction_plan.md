@@ -1041,8 +1041,8 @@ configs/s5.yaml
 交付：
 
 ```
-rq2_results.csv
-dynamic_feature_decile.png
+results/rq2/rq2_results.csv
+results/rq2/dynamic_feature_decile.png
 ```
 
 C 必须保证 B2 和 S5 只有一个差异：
@@ -1076,10 +1076,10 @@ results/s5/oof.parquet
 交付：
 
 ```
-prediction_correlation.png
-stacking_results.csv
-meta_coefficients.csv
-final_evidence_chain.png
+results/rq3/prediction_correlation.png
+results/rq3/stacking_results.csv
+results/rq3/meta_coefficients.csv
+results/rq3/final_evidence_chain.png
 ```
 
 D 负责统一所有章节中的：

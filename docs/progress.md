@@ -73,8 +73,8 @@ RQ1 当前关键增量：
 - [ ] 运行 S4。
 - [ ] 运行 B2。
 - [ ] 运行 S5。
-- [ ] 生成 `rq2_results.csv`。
-- [ ] 生成动态特征十分位风险图。
+- [ ] 生成 `results/rq2/rq2_results.csv`。
+- [ ] 生成 `results/rq2/dynamic_feature_decile.png`。
 - [ ] 起草报告第 4 章。
 
 ## Member D：RQ3 与整合
@@ -85,9 +85,10 @@ RQ1 当前关键增量：
 - [ ] 计算 OOF 预测相关矩阵。
 - [ ] 运行简单平均。
 - [ ] 使用二层 CV 运行 Logistic stacking。
-- [ ] 生成 `stacking_results.csv`。
-- [ ] 生成 `meta_coefficients.csv`。
-- [ ] 生成最终证据链图。
+- [ ] 生成 `results/rq3/stacking_results.csv`。
+- [ ] 生成 `results/rq3/meta_coefficients.csv`。
+- [ ] 生成 `results/rq3/prediction_correlation.png`。
+- [ ] 生成 `results/rq3/final_evidence_chain.png`。
 - [ ] 起草报告第 5、6 章。
 - [ ] 整合并编译 `report/` 中的最终报告。
 
