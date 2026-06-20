@@ -41,8 +41,8 @@
 - [x] 创建 `configs/s3.yaml`。
 - [x] 运行 B1。
 - [x] 运行 S3。
-- [x] 生成 `rq1_results.csv`。
-- [x] 生成 RQ1 gain tree 图。
+- [x] 生成 `results/rq1/rq1_results.csv`。
+- [x] 生成 `results/rq1/rq1_gain_tree.png`。
 - [ ] 起草报告第 3 章。
 
 当前已完成结果：

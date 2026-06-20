@@ -1010,8 +1010,8 @@ configs/s3.yaml
 交付：
 
 ```
-rq1_results.csv
-rq1_gain_tree.png
+results/rq1/rq1_results.csv
+results/rq1/rq1_gain_tree.png
 ```
 
 B 的工作完成标准不是“特征全部写完”，而是能够计算：

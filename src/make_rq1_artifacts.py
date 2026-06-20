@@ -31,10 +31,12 @@ RQ1_COMPARISONS = [
 def main() -> None:
     args = _parse_args()
     results_dir = Path(args.results_dir)
+    output_dir = Path(args.output_dir) if args.output_dir else results_dir / "rq1"
     rq1 = build_rq1_results(results_dir)
-    rq1_path = results_dir / "rq1_results.csv"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    rq1_path = output_dir / "rq1_results.csv"
     rq1.to_csv(rq1_path, index=False)
-    figure_paths = build_gain_tree_figure(rq1, results_dir / "rq1_gain_tree")
+    figure_paths = build_gain_tree_figure(rq1, output_dir / "rq1_gain_tree")
     print(f"Saved {rq1_path}")
     for path in figure_paths:
         print(f"Saved {path}")
@@ -265,6 +267,7 @@ def _format_delta(value: float) -> str:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate RQ1 table and gain tree artifacts.")
     parser.add_argument("--results-dir", default="results")
+    parser.add_argument("--output-dir", default=None, help="Defaults to <results-dir>/rq1")
     return parser.parse_args()
 
 
