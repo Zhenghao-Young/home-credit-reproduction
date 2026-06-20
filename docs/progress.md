@@ -51,6 +51,7 @@
 | --- | --- | --- | --- |
 | S1 | LightGBM | 0.757646 | 78 |
 | S2 | LightGBM | 0.757405 | 379 |
+| S2-full | LightGBM | 0.760329 | 801 |
 | S2-Logistic | Logistic Regression | 0.743054 | 379 |
 | B1 | LightGBM | 0.768159 | 85 |
 | S3 | LightGBM | 0.785109 | 126 |
@@ -60,6 +61,7 @@ RQ1 当前关键增量：
 - B1 − S1 = +0.010513
 - S3 − B1 = +0.016950
 - S2 − S1 = -0.000241
+- S2-full − S1 = +0.002683（诊断性结果，包含 group-difference 特征）
 
 ## Member C：RQ2
 
