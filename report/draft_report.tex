@@ -419,4 +419,171 @@ OOF AUC 增益（$+0.016950$，五折全部同向）。\textbf{业务比例与 \
 “把变长历史聚合为申请人级表示”是最关键的一步。同时它也修正了一个常见的直觉——“多做 groupby 聚合就会更好”
 在本受控设置下并不成立，群组信息真正的价值要等到 S4 以\textbf{相对位置}的形式重新引入时才会显现。
 
+\chapter{RQ2：后期增益来自更精细的信息组织，还是边际改进？}
+\label{chap:rq2}
+
+\section{本章目标}
+
+RQ2 关心的是 Blossom（\texttt{solution-3}）之后，从 Tulip（\texttt{solution-4}）到 Sunflower（\texttt{solution-5}）
+那段持续提升背后，究竟是\textbf{哪一类更精细的信息组织}在起作用。RQ1 已经证明：Chestnut $\to$ Blossom 的早期
+增益中，多表历史聚合贡献了约 $+0.017$，业务比例贡献了约 $+0.011$，而普通群组聚合单独几乎无效。RQ2 继续追问：
+在此基础上，是什么让分数继续走高？
+
+原方案 Tulip 和 Sunflower 的升级是\textbf{复合型}的——版本之间同时打开了群体相对位置、最近行为窗口、清洗修正、
+和动态比值/趋势等多种改动。受控复现将这一复合体拆为三个独立对比：
+
+\begin{itemize}
+\item \textbf{S4 $-$ S3}：群体相对位置与最近窗口行为的价值；
+\item \textbf{B2 $-$ S4}：聚合前对异常编码进行清洗的价值；
+\item \textbf{S5 $-$ B2}：短期/长期比值与趋势特征的价值。
+\end{itemize}
+
+其中，\textbf{B2 是 RQ2 中最重要的桥接实验}：它和 S4 使用完全相同的特征列（184 列，名称一致），唯一的区别是
+B2 的历史表聚合在清洗后的原表上计算，而 S4 在未经清洗的原表上聚合。因此 B2 $-$ S4 能够干净地剥离出 Sunflower
+文档中“清洗修复”的独立贡献——这是原方案六个版本都未提供的因果型证据。
+
+\section{结果总览}
+
+表~\ref{tab:rq2-stages} 给出 RQ2 涉及各阶段的规模与 OOF AUC，表~\ref{tab:rq2-deltas} 给出三组受控配对对比。
+
+\begin{table}[h]
+\centering
+\caption{RQ2 各阶段的 OOF AUC 与规模。S3 作为上游基线一并列出。}
+\label{tab:rq2-stages}
+\begin{tabular}{lrrr}
+\toprule
+阶段 & 特征数 & OOF AUC & 折 AUC 标准差 \\
+\midrule
+S3（Blossom）            & 126 & 0.785109 & 0.001543 \\
+S4（Tulip，群体+最近）   & 184 & 0.786169 & 0.001464 \\
+B2（清洗修复，桥接）     & 184 & 0.786196 & 0.001543 \\
+S5（Sunflower，动态特征）& 191 & 0.786342 & 0.001491 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{RQ2 受控配对对比。同向折数为五折中差值为正的折数。}
+\label{tab:rq2-deltas}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l p{0.32\linewidth} r c p{0.14\linewidth}}
+\toprule
+对比 & 含义 & $\Delta$OOF AUC & 同向折数 & 稳定性 \\
+\midrule
+S4 $-$ S3 & 群体相对位置 + 最近窗口 & $+0.001060$ & 4/5 & 稳定增益 \\
+B2 $-$ S4 & 聚合前清洗修复 & $\approx 0$    & 2/5 & 不稳定/证据不足 \\
+S5 $-$ B2 & 短期/长期比值 + 趋势 & $+0.000146$  & 3/5 & 不稳定/证据不足 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+图~\ref{fig:rq2-gain-tree} 把三组对比画成增益树：从 S3 出发，首先加入群体相对位置和最近窗口（S4），然后考察清洗
+效果（B2），最后叠加动态比值和趋势（S5）。每条箭头标注 $\Delta$OOF AUC 与稳定性判定。
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,inner sep=6pt,font=\small},
+  arr/.style={-{Stealth[length=2.6mm]},thick}
+]
+\node[box,fill=gray!12]   (s3) at (0,0)     {S3\\AUC 0.785109};
+\node[box,fill=blue!8]    (s4) at (5.0,0)   {S4\\AUC 0.786169};
+\node[box,fill=yellow!18] (b2) at (10.0,1.2){B2\\AUC 0.786196};
+\node[box,fill=green!14]  (s5) at (10.0,-1.2){S5\\AUC 0.786342};
+\draw[arr] (s3) -- (s4)
+  node[midway,above,font=\footnotesize]{$\Delta=+0.001060$（稳定）};
+\draw[arr] (s4) -- (b2)
+  node[midway,above,sloped,font=\footnotesize]{$\Delta\approx 0$（不稳定）};
+\draw[arr] (b2) -- (s5)
+  node[midway,left,font=\footnotesize]{$\Delta=+0.000146$（不稳定）};
+\end{tikzpicture}
+\caption{RQ2 的 OOF AUC 增益树。只有 S4 $-$ S3（群体相对位置+最近窗口）取得了稳定增益；清洗修复和动态特征的
+贡献在本设定下无法被确认。}
+\label{fig:rq2-gain-tree}
+\end{figure}
+
+\section{增益归因分析}
+
+\subsection{群体相对位置与最近行为的稳定贡献}
+
+S4 在 S3 的 126 维特征上增加了 58 个特征——30 个群体相对位置特征（个人值减去同职业/同学历/同性别群体的均值，
+以及该差值的绝对值）和 28 个最近窗口行为特征（最近 1/3/5 笔贷款申请、最近 10/50 条分期还款和 POS 消费记录）。
+S4 $-$ S3 的 OOF AUC 增益为 $+0.001060$，五折中四折同向，按稳定性判据属于稳定增益。
+
+这一增益在量级上远小于 RQ1 中从零构建历史聚合的那一步（$+0.017$），但方向的一致性值得认真对待。机制上，群体
+相对位置特征将信息从“绝对值是多少”转化为“在同类人中处于什么位置”——同一个年收入 5 万元，对洗碗工和医生
+意味着完全不同的还款能力。类似地，最近窗口特征将信息从“全量均值”转化为“最近趋势”：一个申请人在 installments
+上过去 5 年整体逾期率不高，但最近 10 笔全部逾期——全量均值会掩盖这一恶化的信号，而最近窗口能将其暴露出来。
+
+值得注意的一个细节是：S4 中群体相对位置只产生差值（$x - \bar{x}_g$）和绝对差值（$|x - \bar{x}_g|$），不保留
+群组均值原值。这是刻意的设计——RQ1 的 S2 实验已经证明，群组聚合原值几乎不提供增量信息；真正有价值的是相对位置，
+即“个人偏离群体均值的程度”。把原值与差值分开，避免了把后者的功劳错记到前者头上。
+
+\subsection{清洗修复为何在本设定下无效}
+
+B2 相对 S4 的 OOF AUC 变化仅为 $+0.000027$，五折方向混乱（2/5 正向），按判据属于“不稳定/证据不足”。细查发现，
+这并非实现错误，而是\textbf{清洗规则与聚合列的不匹配}。
+
+复现计划规定 B2 清洗以下异常：application 沿用 S1 的五条规则（已对所有阶段生效）、bureau 的三个 \texttt{DAYS\_*}
+列中 $< -40000$ 的值转为缺失、previous\_application 的五个 \texttt{DAYS\_*} 列中 $=365243$ 的值转为缺失、
+credit\_card 的两个 \texttt{AMT\_DRAWINGS\_*} 列中负值转为缺失。B2 代码确实正确地在聚合前应用了这些清洗。
+但在 S3/S4 的原始聚合中，bureau 只需要 \texttt{AMT\_CREDIT\_SUM/DEBT/OVERDUE} 和 \texttt{DAYS\_CREDIT}；previous\_application
+只需要 \texttt{AMT\_APPLICATION/CREDIT}、\texttt{DAYS\_DECISION} 和 \texttt{CNT\_PAYMENT}；credit\_card 只需要
+\texttt{AMT\_BALANCE}、\texttt{AMT\_CREDIT\_LIMIT\_ACTUAL} 和 \texttt{SK\_DPD}。\textbf{所有被清洗的列都不在聚合范围内。}
+
+因此，虽然 B2 的每一个预测值都与 S4 不同（预测级最大差异达 0.005，预测相关系数 0.995），但这些差异来自清洗对
+模型输入特征\textbf{完全没有影响}的列所导致的随机波动，而非清洗修复带来的系统性改善。B2 $-$ S4 本质上测量的是
+一个零效果——这在方法论上是一个有效的实验结果：\textbf{Sunflower 的清洗修复，其价值依赖于聚合列覆盖了清洗目标列；
+在覆盖面不足时，该修复不会产生增益。}
+
+\subsection{动态比值与趋势缺乏稳定增益}
+
+S5 在 B2 之上增加了 7 个动态特征——4 个短期/长期比值（POS 和 installments 的最近 10 期/50 期逾期率之比和
+SK\_DPD 均值之比）和 3 个 POS CASH SK\_DPD 的线性趋势（最近 12、30、60 个月窗口）。S5 $-$ B2 的 OOF AUC 增益
+为 $+0.000146$，五折中仅三折同向，按判据属于“不稳定/证据不足”。
+
+三个可能的原因。第一，\textbf{比值与窗口特征高度冗余}：最近 10 期和最近 50 期的聚合值已经作为独立特征（S4 的
+最近窗口行为）存在于模型中，它们的比值在整个特征空间中被四则运算“覆盖”的概率很高——LightGBM 完全可以在相邻
+分裂中隐式地构造出分子与分母的比较。第二，\textbf{SK\_DPD 序列高度稀疏}：POS CASH 表中 97\% 的记录 SK\_DPD = 0。
+对大多数申请人来说，在任何一个有限时间窗口内，SK\_DPD 的序列不过是几个零和一两个非零值的混合；对这样稀疏的信号
+拟合线性趋势，斜率 $\hat\beta$ 的方差极大，信息含量有限。第三，\textbf{特征数量太少}：原方案 Sunflower 在数十个列上
+计算窗口比值和趋势（而非本实验仅限定的 4 个比值 + 3 个趋势），可能依靠大量弱信号的累积效应来获得可测量的提升。
+
+\section{与原始 Open Solution 历史的对照}
+
+原始 Tulip（\texttt{solution-4}）宣称 CV 从 0.7840 提升到 0.7905（$+0.0065$），而 Sunflower（\texttt{solution-5}）
+进一步提升到 0.7950（$+0.0045$）。我们的受控 S4 仅取得 $+0.0011$，S5 几乎为零。这种差异需要仔细解释。
+
+首先，原始 Tulip 版本在一层中同时上线了群体相对位置、近期行为、更多清洗规则、更细粒度的历史聚合列和大量额外
+的手工特征，特征数量从 solution-3 的约两百增加到 solution-4 的数百。我们的 S4 严格控制只打开两块（群体相对位置
++ 最近窗口），特征增量被压制到 58。因此原始方案中 $+0.0065$ 的增益中，只有约 $+0.0011$ 可以被归因为“相对位置
+与近期行为”这一特定的信息组织方式；其余部分来自同期加入的、本实验未覆盖的更丰富的聚合与手工特征。
+
+其次，原始 Sunflower 版本的 $+0.0045$ 增益，根据本实验的 B2 和 S5 结果，\textbf{几乎不能归因于清洗修复或动态比值/
+趋势}——至少在我们保留的最核心的 41 个历史聚合特征上是如此。这意味着 Sunflower 的真正增益来源可能在于同期加入的
+\textbf{更大规模的特征扩展}（原方案在 solution-5 中将聚合列扩展到几乎所有数值列），而非清洁修复或动态分析本身。
+
+\section{本章结论}
+
+综合三组受控对比，RQ2 可以明确回答如下：
+
+\begin{quote}
+在受控复现下，Blossom $\to$ Sunflower 的后期增益中，\textbf{唯一可以确认的来源是群体相对位置和最近窗口行为}
+（S4 $-$ S3 为 $+0.001060$，四折同向，稳定增益）。\textbf{聚合前清洗修复在原始聚合范围下未产生增益}（B2 $-$ S4
+$\approx 0$，清洗目标列不在 S3/S4 的 41 个聚合特征内）。\textbf{短期/长期比值和 SK\_DPD 趋势特征在本实验设定下
+未产生稳定增益}（S5 $-$ B2 为 $+0.000146$，仅 3/5 折同向）。
+\end{quote}
+
+将 RQ1 与 RQ2 串联起来看，从 Chestnut 到 Sunflower 的完整证据链呈现出一个清晰的梯度：
+
+\[
++0.0105_{\text{业务比例}} \;>\; +0.0169_{\text{历史聚合}} \;\gg\; +0.0011_{\text{群体+最近}} \;\approx\; 0_{\text{清洗修复}} \;\approx\; 0_{\text{动态特征}}.
+\]
+
+最大的性能跃升来自 RQ1 阶段的多表历史聚合——把变长的行为记录转化为申请人级统计表示，这是整个 Open Solution
+演进中“信息量最大的一步”。其后 RQ2 阶段的增益虽然方向正确，但规模已经大幅缩水（仅为早期增益的 1/15 至 1/30）。
+这表明：\textbf{当核心的关系型信息已经被提取之后，进一步精细化——包括引入群体相对位置、清洗顺序和动态变化——虽然
+在理论上值得追求，但其实际收益高度依赖于特征的覆盖广度，在最小化特征集下的独立贡献非常有限。}
+
 \end{document}
