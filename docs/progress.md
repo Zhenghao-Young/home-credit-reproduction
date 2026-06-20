@@ -65,19 +65,19 @@ RQ1 当前关键增量：
 
 ## Member C：RQ2
 
-- [ ] 实现群体相对位置特征。
-- [ ] 实现最近窗口行为特征。
-- [ ] 实现聚合前清洗实验变体。
-- [ ] 实现动态比值和趋势特征。
-- [ ] 创建 `configs/s4.yaml`。
-- [ ] 创建 `configs/b2.yaml`。
-- [ ] 创建 `configs/s5.yaml`。
-- [ ] 运行 S4。
-- [ ] 运行 B2。
-- [ ] 运行 S5。
-- [ ] 生成 `results/rq2/rq2_results.csv`。
-- [ ] 生成 `results/rq2/dynamic_feature_decile.png`。
-- [ ] 起草报告第 4 章。
+- [x] 实现群体相对位置特征。
+- [x] 实现最近窗口行为特征。
+- [x] 实现聚合前清洗实验变体。
+- [x] 实现动态比值和趋势特征。
+- [x] 创建 `configs/s4.yaml`。
+- [x] 创建 `configs/b2.yaml`。
+- [x] 创建 `configs/s5.yaml`。
+- [x] 运行 S4。
+- [x] 运行 B2。
+- [x] 运行 S5。
+- [x] 生成 `results/rq2/rq2_results.csv`。
+- [x] 生成 `results/rq2/dynamic_feature_decile.png`。
+- [x] 起草报告第 4 章。
 
 ## Member D：RQ3 与整合
 

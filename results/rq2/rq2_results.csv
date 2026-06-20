@@ -1,0 +1,8 @@
+row_type,stage,model,parent_stage,comparison,label,interpretation,oof_auc,fold_auc_mean,fold_auc_std,n_features,delta_oof_auc,fold_delta_mean,fold_delta_std,positive_fold_deltas,stability
+stage,s3,lightgbm,,,S3: Blossom baseline (historical tables),,0.785108556710398,0.785137902923649,0.001542766803198,126,,,,,
+stage,s4,lightgbm,s3,,S4: group-relative position + recent windows,,0.786168942343972,0.786182829026133,0.001463974080506,184,,,,,
+stage,b2,lightgbm,s4,,B2: pre-aggregation cleaning (bridge),,0.78619631435315,0.786206584425978,0.001543234959048,184,,,,,
+stage,s5,lightgbm,b2,,S5: short/long-term ratios + SK_DPD trends,,0.786341886252593,0.786351751611201,0.001491113469812,191,,,,,
+comparison,s4,lightgbm,s3,S4 - S3,S4 - S3,group-relative position + recent-window behavior,0.786168942343972,0.786182829026133,0.001463974080506,184,0.0010603856335738016,0.0010449261024839452,0.0004318269245436976,5.0,stable gain
+comparison,b2,lightgbm,s4,B2 - S4,B2 - S4,pre-aggregation cleaning fix,0.78619631435315,0.786206584425978,0.001543234959048,184,2.737200917812821e-05,2.375539984564856e-05,0.0003258054404663494,2.0,unstable or insufficient evidence
+comparison,s5,lightgbm,b2,S5 - B2,S5 - B2,short/long-term ratios + trend features,0.786341886252593,0.786351751611201,0.001491113469812,191,0.00014557189944242044,0.00014516718522270545,0.0003745786784372258,3.0,unstable or insufficient evidence
