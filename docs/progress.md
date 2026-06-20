@@ -13,7 +13,7 @@
 
 - [x] M1：S1 基线使用固定 folds 完整跑通，并能计算 OOF AUC。
 - [x] M2：RQ1 完成，S1、S2、B1、S3 结果可比较，RQ1 表图与报告第 3 章已完成。
-- [ ] M3：RQ2 完成，S4、B2、S5 结果可比较。
+- [x] M3：RQ2 完成，S4、B2、S5 结果可比较。
 - [ ] M4：RQ3 完成，包含简单平均和 Logistic stacking。
 - [~] M5：最终报告在 `report/` 中编译完成。
 
@@ -47,14 +47,17 @@
 
 当前已完成结果：
 
-| stage | model | OOF AUC | n_features |
-| --- | --- | --- | --- |
-| S1 | LightGBM | 0.757646 | 78 |
-| S2 | LightGBM | 0.757405 | 379 |
-| S2-full | LightGBM | 0.760329 | 801 |
-| S2-Logistic | Logistic Regression | 0.743054 | 379 |
-| B1 | LightGBM | 0.768159 | 85 |
-| S3 | LightGBM | 0.785109 | 126 |
+| stage | model | OOF AUC | Kaggle public AUC | Kaggle private AUC | n_features |
+| --- | --- | ---: | ---: | ---: | ---: |
+| S1 | LightGBM | 0.757646 | 0.74770 | 0.74418 | 78 |
+| S2 | LightGBM | 0.757405 | 0.74656 | 0.74471 | 379 |
+| S2-full | LightGBM | 0.760329 | 0.74920 | 0.74859 | 801 |
+| S2-Logistic | Logistic Regression | 0.743054 | 0.73544 | 0.73049 | 379 |
+| B1 | LightGBM | 0.768159 | 0.76716 | 0.76307 | 85 |
+| S3 | LightGBM | 0.785109 | 0.78900 | 0.78562 | 126 |
+| S4 | LightGBM | 0.786169 | 0.79294 | 0.78666 | 184 |
+| B2 | LightGBM | 0.786196 | 0.79164 | 0.78686 | 184 |
+| S5 | LightGBM | 0.786342 | 0.79137 | 0.78696 | 191 |
 
 RQ1 当前关键增量：
 
@@ -65,19 +68,25 @@ RQ1 当前关键增量：
 
 ## Member C：RQ2
 
-- [ ] 实现群体相对位置特征。
-- [ ] 实现最近窗口行为特征。
-- [ ] 实现聚合前清洗实验变体。
-- [ ] 实现动态比值和趋势特征。
-- [ ] 创建 `configs/s4.yaml`。
-- [ ] 创建 `configs/b2.yaml`。
-- [ ] 创建 `configs/s5.yaml`。
-- [ ] 运行 S4。
-- [ ] 运行 B2。
-- [ ] 运行 S5。
-- [ ] 生成 `results/rq2/rq2_results.csv`。
-- [ ] 生成 `results/rq2/dynamic_feature_decile.png`。
-- [ ] 起草报告第 4 章。
+- [x] 实现群体相对位置特征。
+- [x] 实现最近窗口行为特征。
+- [x] 实现聚合前清洗实验变体。
+- [x] 实现动态比值和趋势特征。
+- [x] 创建 `configs/s4.yaml`。
+- [x] 创建 `configs/b2.yaml`。
+- [x] 创建 `configs/s5.yaml`。
+- [x] 运行 S4。
+- [x] 运行 B2。
+- [x] 运行 S5。
+- [x] 生成 `results/rq2/rq2_results.csv`。
+- [x] 生成 `results/rq2/rq2_gain_tree.png`。
+- [x] 起草报告第 4 章。
+
+## 官方提交状态
+
+S1、S2、S2-full、S2-Logistic、B1、S3、S4、B2 和 S5 均已提交到 Kaggle
+`home-credit-default-risk`，状态均为 `SubmissionStatus.COMPLETE`。官方 public/private AUC
+记录在 `results/summary.csv` 的 `kaggle_*` 列中。
 
 ## Member D：RQ3 与整合
 
