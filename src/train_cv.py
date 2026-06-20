@@ -25,6 +25,7 @@ from src.features.application_base import (
     clean_application,
     load_application_train,
 )
+from src.features.application_business import build_b1_business_features
 from src.features.application_groupby import (
     FULL_GROUPBY_SPECS,
     FoldSafeGroupbyAggregateDiffs,
@@ -33,7 +34,7 @@ from src.metrics import auc_score, build_fold_metrics, summarize_oof_auc, valida
 from src.split import FOLD_COLUMN, load_folds
 
 
-SUPPORTED_STAGES = {"s1", "s2", "s2_full", "s2_logistic"}
+SUPPORTED_STAGES = {"s1", "b1", "s2", "s2_full", "s2_logistic"}
 SUPPORTED_MODELS = {"lightgbm", "logistic"}
 MISSING_CATEGORY = "__MISSING__"
 UNKNOWN_CATEGORY = "__UNKNOWN__"
@@ -79,8 +80,8 @@ def run_cv(stage: str, model_name: str, config_path: str | Path, predict_test: b
         raise ValueError(f"unsupported stage {stage!r}; expected one of {sorted(SUPPORTED_STAGES)}")
     if model_name not in SUPPORTED_MODELS:
         raise ValueError(f"unsupported model {model_name!r}; expected one of {sorted(SUPPORTED_MODELS)}")
-    if stage == "s1" and model_name != "lightgbm":
-        raise ValueError("S1 is only defined for LightGBM in Member A")
+    if stage in {"s1", "b1"} and model_name != "lightgbm":
+        raise ValueError("S1 and B1 are only defined for LightGBM")
     if stage == "s2_logistic" and model_name != "logistic":
         raise ValueError("s2_logistic must use --model logistic")
     if stage in {"s2", "s2_full"} and model_name != "lightgbm":
@@ -212,7 +213,16 @@ def _build_fold_features(
     feature_names = list(base_feature_names)
     categorical_columns = [col for col in base_categorical if col in feature_names]
 
-    if stage in {"s2", "s2_logistic"}:
+    if stage == "b1":
+        train_business, business_feature_names = build_b1_business_features(train_df)
+        valid_business, _ = build_b1_business_features(valid_df)
+        train_features = train_features.merge(train_business, on=ID_COLUMN, how="left", validate="one_to_one")
+        valid_features = valid_features.merge(valid_business, on=ID_COLUMN, how="left", validate="one_to_one")
+        if test_features is not None:
+            test_business, _ = build_b1_business_features(test_df)
+            test_features = test_features.merge(test_business, on=ID_COLUMN, how="left", validate="one_to_one")
+        feature_names = feature_names + business_feature_names
+    elif stage in {"s2", "s2_logistic"}:
         groupby = FoldSafeGroupbyAggregateDiffs(
             specs=FULL_GROUPBY_SPECS,
             include_group_values=True,

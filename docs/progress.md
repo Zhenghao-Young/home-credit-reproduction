@@ -35,11 +35,11 @@
 
 ## Member B：RQ1
 
-- [ ] 实现 application 业务特征。
+- [x] 实现 application 业务特征。
 - [ ] 实现基础历史表聚合。
-- [ ] 创建 `configs/b1.yaml`。
+- [x] 创建 `configs/b1.yaml`。
 - [ ] 创建 `configs/s3.yaml`。
-- [ ] 运行 B1。
+- [x] 运行 B1。
 - [ ] 运行 S3。
 - [ ] 生成 `rq1_results.csv`。
 - [ ] 生成 RQ1 gain tree 图。
