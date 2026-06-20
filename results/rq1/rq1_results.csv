@@ -1,0 +1,10 @@
+row_type,stage,model,parent_stage,comparison,label,interpretation,oof_auc,fold_auc_mean,fold_auc_std,n_features,delta_oof_auc,fold_delta_mean,fold_delta_std,positive_fold_deltas,stability
+stage,s1,lightgbm,,,S1: application baseline,,0.7576457172288115,0.7576719144773476,0.0024601629097999,78,,,,,
+stage,s2,lightgbm,s1,,S2: application group aggregations,,0.7574048470249772,0.7574348268647734,0.0023577417518541,379,,,,,
+stage,s2_logistic,logistic,s2,,S2-Logistic: linear model bridge,,0.7430544805623402,0.7430732797227773,0.0036363547093143,379,,,,,
+stage,b1,lightgbm,s1,,B1: business ratios,,0.7681588549788453,0.7681776676946679,0.0018640892739582,85,,,,,
+stage,s3,lightgbm,b1,,S3: historical tables,,0.7851085567103984,0.7851379029236488,0.0015427668031977,126,,,,,
+comparison,s2,lightgbm,s1,S2 - S1,S2 - S1,ordinary application group aggregations,0.7574048470249772,0.7574348268647734,0.0023577417518541,379,-0.0002408702038342314,-0.00023708761257421607,0.0004302734237830742,1.0,unstable or insufficient evidence
+comparison,b1,lightgbm,s1,B1 - S1,B1 - S1,business ratios and EXT_SOURCE summaries,0.7681588549788453,0.7681776676946679,0.0018640892739582,85,0.010513137750033819,0.010505753217320345,0.001140597204011804,5.0,stable gain
+comparison,s3,lightgbm,b1,S3 - B1,S3 - B1,multi-table historical aggregations,0.7851085567103984,0.7851379029236488,0.0015427668031977,126,0.01694970173155308,0.016960235228980956,0.0005923535929488815,5.0,stable gain
+comparison,s2,lightgbm,s2_logistic,S2-LGBM - S2-Logistic,S2-LGBM - S2-Logistic,tree nonlinearity on S2 features,0.7574048470249772,0.7574348268647734,0.0023577417518541,379,0.014350366462636988,0.014361547141996089,0.0017388324289430396,5.0,stable gain
