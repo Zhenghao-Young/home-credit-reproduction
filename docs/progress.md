@@ -14,7 +14,7 @@
 - [x] M1：S1 基线使用固定 folds 完整跑通，并能计算 OOF AUC。
 - [x] M2：RQ1 完成，S1、S2、B1、S3 结果可比较，RQ1 表图与报告第 3 章已完成。
 - [x] M3：RQ2 完成，S4、B2、S5 结果可比较。
-- [ ] M4：RQ3 完成，包含简单平均和 Logistic stacking。
+- [x] M4：RQ3 完成，简单平均和 Logistic stacking 结果已产出，S6 对比分析已生成。
 - [~] M5：最终报告在 `report/` 中编译完成。
 
 ## Member A：基础设施、S1、S2
@@ -58,6 +58,8 @@
 | S4 | LightGBM | 0.786169 | 0.79294 | 0.78666 | 184 |
 | B2 | LightGBM | 0.786196 | 0.79164 | 0.78686 | 184 |
 | S5 | LightGBM | 0.786342 | 0.79137 | 0.78696 | 191 |
+| S6-Avg | Stacking | 0.777088 | — | — | 4 |
+| S6-Stack | Stacking | 0.780383 | — | — | 4 |
 
 RQ1 当前关键增量：
 
@@ -82,6 +84,15 @@ RQ1 当前关键增量：
 - [x] 生成 `results/rq2/rq2_gain_tree.png`。
 - [x] 起草报告第 4 章。
 
+RQ2 当前关键增量：
+
+- S4 − S3 = +0.001060（群体相对位置 + 最近窗口的稳定增益，5 折同向）
+- B2 − S4 = +0.000027（聚合前清洗修复几乎零增益，5 折中仅 2 折正）
+- S5 − B2 = +0.000146（动态比值与趋势几乎零增益，5 折中仅 3 折正）
+
+结论：RQ2 阶段最大且唯一稳定的增益来自 S4 的群体相对位置和最近窗口特征；
+清洗修复（B2）和动态特征（S5）在实际数据上增益微乎其微。
+
 ## 官方提交状态
 
 S1、S2、S2-full、S2-Logistic、B1、S3、S4、B2 和 S5 均已提交到 Kaggle
@@ -90,18 +101,33 @@ S1、S2、S2-full、S2-Logistic、B1、S3、S4、B2 和 S5 均已提交到 Kaggl
 
 ## Member D：RQ3 与整合
 
-- [ ] 实现 `src/stacking.py`。
-- [ ] 实现 `src/make_final_figures.py`。
-- [ ] 构建一级模型 OOF 预测矩阵。
-- [ ] 计算 OOF 预测相关矩阵。
-- [ ] 运行简单平均。
-- [ ] 使用二层 CV 运行 Logistic stacking。
-- [ ] 生成 `results/rq3/stacking_results.csv`。
-- [ ] 生成 `results/rq3/meta_coefficients.csv`。
-- [ ] 生成 `results/rq3/prediction_correlation.png`。
-- [ ] 生成 `results/rq3/final_evidence_chain.png`。
+- [x] 实现 `src/stacking.py`。
+- [x] 实现 `src/make_final_figures.py`。
+- [x] 构建一级模型 OOF 预测矩阵。
+- [x] 计算 OOF 预测相关矩阵。
+- [x] 运行简单平均。
+- [x] 使用二层 CV 运行 Logistic stacking。
+- [x] 生成 `results/rq3/stacking_results.csv`。
+- [x] 生成 `results/rq3/meta_coefficients.csv`。
+- [x] 生成 `results/rq3/prediction_correlation.png`。
+- [x] 生成 `results/rq3/final_evidence_chain.png`。
 - [ ] 起草报告第 5、6 章。
 - [ ] 整合并编译 `report/` 中的最终报告。
+
+RQ3 当前关键发现：
+
+| 方法 | OOF AUC | Δ vs S5 |
+| --- | ---: | ---: |
+| S5 (最佳单模型) | 0.786342 | — |
+| 简单平均 (S2-LR + S3 + S4 + S5) | 0.777088 | -0.009254 |
+| L2-Logistic stacking | 0.780383 | -0.005959 |
+
+- S3、S4、S5 的 OOF 预测高度相关（ρ = 0.978–0.991），几乎犯相同错误，互补性极弱。
+- S2-LR 与 LightGBM 预测相关性较低（ρ ≈ 0.72），但自身 AUC 太低（0.743），拖低平均值。
+- 元系数排序：S5 (3.52) > S4 (2.29) > S3 (1.80) > S2-LR (1.72)，Logistic stacking 已自动给
+  最佳模型最高权重，但仍无法超越 S5。
+
+结论：在特征高度同质化的 LightGBM 系列中，stacking 无法产生额外增益；S5 即最终最佳模型。
 
 ## 输出约定
 

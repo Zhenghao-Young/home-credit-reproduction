@@ -1,0 +1,4 @@
+method,oof_auc,delta_vs_s5,fold_delta_mean,fold_delta_std,positive_folds,stability
+S5: best single model (LightGBM),0.7863418862525927,0.0,0.0,0.0,5,baseline
+Simple average (s2_lr + s3 + s4 + s5),0.7770878805893677,-0.009254005663224985,-0.009249864265811958,0.001354200466272553,0,unstable
+L2-Logistic stacking (s2_lr + s3 + s4 + s5),0.7803828464705063,-0.0059590397820864505,-0.005937465339254655,0.00122112698794027,0,unstable
