@@ -227,7 +227,58 @@ results/<stage>/config.yaml
 results/<stage>/submission.csv
 ```
 
-## 5. 新阶段接入规则
+## 5. Kaggle 官方分数
+
+提交前先确认 Kaggle CLI 和凭据可用：
+
+```powershell
+.\.venv\Scripts\kaggle.exe --version
+```
+
+如果使用新版 Kaggle CLI 的浏览器登录，先运行：
+
+```powershell
+kaggle auth login
+```
+
+本机 Python 3.9 环境只能安装 Kaggle CLI 1.x；如果浏览器登录来自另一个 Python 3.11+
+环境，可把该 CLI 路径写入 `KAGGLE_BIN`，提交脚本会优先使用它：
+
+```powershell
+[Environment]::SetEnvironmentVariable("KAGGLE_BIN", "C:\path\to\kaggle.exe", "User")
+```
+
+传统 API token 也可用，文件放在：
+
+```text
+C:\Users\Hwa\.kaggle\kaggle.json
+```
+
+查看将要提交的版本和顺序：
+
+```powershell
+.\.venv\Scripts\python.exe -m src.submit_kaggle_scores --dry-run
+```
+
+正式提交当前已有 `results/<stage>/submission.csv` 的版本：
+
+```powershell
+.\.venv\Scripts\python.exe -m src.submit_kaggle_scores
+```
+
+脚本默认提交 `home-credit-default-risk`，并按 `summary.csv` 中的 OOF AUC 从高到低提交。
+若遇到 Kaggle 当日提交额度或 API 拒绝，脚本会保留已经写回的官方成绩，并列出剩余版本供下一批继续提交。
+
+`results/summary.csv` 中的官方分数列含义：
+
+- `kaggle_public_auc`：Kaggle public leaderboard AUC。
+- `kaggle_private_auc`：Kaggle private leaderboard AUC。
+- `kaggle_submission_date`：Kaggle 返回的提交时间。
+- `kaggle_submission_status`：Kaggle 返回的提交状态。
+- `kaggle_submission_description`：本次提交使用的唯一 message。
+- `kaggle_file_name`：Kaggle submissions 列表返回的文件名。
+
+## 6. 新阶段接入规则
 
 新增特征模块建议放在 `src/features/` 下，不要把大量逻辑塞进 `src/train_cv.py`。
 
@@ -250,7 +301,7 @@ src/stacking.py                        # S6
 
 如果某个 stage 需要 fold-safe 统计量，应在当前 fold 的 `train_df` 上 `fit`，再分别 `transform` 训练折、验证折和测试集。
 
-## 6. 结果校验
+## 7. 结果校验
 
 快速查看已完成结果汇总：
 
@@ -278,7 +329,7 @@ conda run -n credit python -c "import pandas as pd; from src.split import load_f
 - `fold_id` 与 `data/folds.csv` 一致。
 - `feature_names.txt` 与代码中实际训练列一致。
 
-## 7. 四人分工
+## 8. 四人分工
 
 | 成员 | 负责实验 | 负责章节 | 主要交付物 |
 | --- | --- | --- | --- |
@@ -289,7 +340,7 @@ conda run -n credit python -c "import pandas as pd; from src.split import load_f
 
 详细阶段定义和解释口径见 [reproduction_plan.md](reproduction_plan.md)。
 
-## 8. 报告编译
+## 9. 报告编译
 
 当前草稿：
 

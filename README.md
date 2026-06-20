@@ -12,15 +12,16 @@
 
 ## 现在有什么
 
-当前已完成公共实验骨架、S1/S2 基础阶段，以及 RQ1 中的 B1/S3 阶段：
+当前已完成公共实验骨架、RQ1 和 RQ2 的受控实验阶段，并已把 S1 到 S5
+的 9 个可提交版本提交到 Kaggle 官方榜单：
 
 | 模块 | 当前状态 |
 | --- | --- |
 | 数据 | 原始 Kaggle 数据放在 `data/original/`，该目录已被 Git 忽略；固定折划分为 `data/folds.csv`。 |
-| 代码 | `src/` 下已有固定折、指标校验、训练入口、S1/S2 application 特征、B1 业务特征和 S3 历史表基础聚合。 |
-| 结果 | 已有 `results/s1/`、`results/s2/`、`results/s2_full/`、`results/s2_logistic/`、`results/b1/`、`results/s3/` 和 `results/rq1/`，项目汇总见 `results/summary.csv`。 |
+| 代码 | `src/` 下已有固定折、指标校验、训练入口、S1/S2 application 特征、B1 业务特征、S3 历史表聚合、S4 群体/最近窗口特征、B2 清洗桥接和 S5 动态特征。 |
+| 结果 | 已有 `results/s1/`、`results/s2/`、`results/s2_full/`、`results/s2_logistic/`、`results/b1/`、`results/s3/`、`results/s4/`、`results/b2/`、`results/s5/`、`results/rq1/` 和 `results/rq2/`；项目汇总和 Kaggle 官方分数见 `results/summary.csv`。 |
 | 参考实现 | `open-solution/` 是上游解答 submodule，只读参考，不在其中改代码。 |
-| 报告 | `report/draft_report.tex` 和 `report/draft_report.pdf` 已包含第 1--3 章草稿，其中第 3 章完成 RQ1 分析。 |
+| 报告 | `report/draft_report.tex` 和 `report/draft_report.pdf` 已包含第 1--4 章草稿，其中第 3 章完成 RQ1 分析，第 4 章完成 RQ2 分析。 |
 
 旧的 `home-credit-default-risk/` 数据占位目录已废弃；当前默认数据入口是 `data/original/`。
 
@@ -125,7 +126,8 @@ results/s1/submission.csv
 - 验证折和测试集不能参与任何 fold 内统计量的 fit。
 - LightGBM 使用 `configs/base_lgbm.yaml` 中的固定参数，不做大规模调参。
 - 新增 stage 的结果写入 `results/<stage>/`。
-- 临时 Kaggle 分数不要写入复现计划；计划只记录实验设计和实现口径。
+- 临时 Kaggle 分数不要写入复现计划；计划只记录实验设计和实现口径。已完成提交的官方
+  public/private 分数记录在 `results/summary.csv` 的 `kaggle_*` 列中。
 
 更完整的运行、校验和成员协作流程见 [docs/workflow.md](docs/workflow.md)。
 

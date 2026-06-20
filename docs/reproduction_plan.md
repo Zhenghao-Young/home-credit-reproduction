@@ -1045,7 +1045,7 @@ configs/s5.yaml
 
 ```
 results/rq2/rq2_results.csv
-results/rq2/dynamic_feature_decile.png
+results/rq2/rq2_gain_tree.png
 ```
 
 C 必须保证 B2 和 S5 只有一个差异：

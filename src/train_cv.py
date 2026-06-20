@@ -45,6 +45,14 @@ SUPPORTED_STAGES = {"s1", "b1", "s2", "s2_full", "s2_logistic", "s3", "s4", "b2"
 SUPPORTED_MODELS = {"lightgbm", "logistic"}
 MISSING_CATEGORY = "__MISSING__"
 UNKNOWN_CATEGORY = "__UNKNOWN__"
+KAGGLE_SUMMARY_COLUMNS = [
+    "kaggle_public_auc",
+    "kaggle_private_auc",
+    "kaggle_submission_date",
+    "kaggle_submission_status",
+    "kaggle_submission_description",
+    "kaggle_file_name",
+]
 
 
 class OrdinalCategoryEncoder:
@@ -487,9 +495,22 @@ def _update_summary(
     )
     if summary_path.exists():
         summary = pd.read_csv(summary_path)
-        summary = summary[~((summary["stage"] == stage) & (summary["model"] == model_name))]
+        for column in KAGGLE_SUMMARY_COLUMNS:
+            if column not in summary.columns:
+                summary[column] = np.nan
+        matched = (summary["stage"] == stage) & (summary["model"] == model_name)
+        if matched.any():
+            existing_kaggle = summary.loc[matched, KAGGLE_SUMMARY_COLUMNS].iloc[-1]
+            for column in KAGGLE_SUMMARY_COLUMNS:
+                row[column] = existing_kaggle[column]
+        else:
+            for column in KAGGLE_SUMMARY_COLUMNS:
+                row[column] = np.nan
+        summary = summary[~matched]
         summary = pd.concat([summary, row], axis=0, ignore_index=True)
     else:
+        for column in KAGGLE_SUMMARY_COLUMNS:
+            row[column] = np.nan
         summary = row
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(summary_path, index=False)
