@@ -54,7 +54,8 @@
 % ═══ 首页 ═══
 \begingroup
 \centering
-{\Large\bfseries《工程数据分析》课程项目报告}\\[6pt]
+\vspace{24pt}
+{\LARGE\bfseries《工程数据分析》课程项目报告}\\[6pt]
 {\large\bfseries --Home Credit Open Solution 的受控复现--}\\[10pt]
 {\normalsize \today}
 \par
@@ -151,7 +152,7 @@ S6   & Four Leaf Clover & 在一级 OOF 预测上做 stacking & 预测互补 \\
 
 \subsection{评价方法与数据安全}
 
-我们是严重哦所有 LightGBM 阶段使用相同五折分层划分、相同
+我们是严格对于所有 LightGBM 阶段使用相同五折分层划分、相同
 LightGBM 参数，主指标为折外 AUC（OOF AUC）。实验中为了方便判断，我们设计了一个描述性的标准，即平均增益为正，且至少 4/5 折同向，称为"稳定增益"；否则为"不稳定/证据不足"。
 
 我们给定每条 OOF 预测来自一个没见过该申请人的模型如下：
@@ -175,7 +176,7 @@ S1 仅使用 application 表的 78 个特征，若干已知异常编码转为缺
 聚合、历史表特征与动态窗口，作为参照点。S2 在 S1 之上加入 fold-safe 的群组聚合原值（301 个
 特征，379 列总计），聚合涵盖贷款金额、年金、收入、商品价格、外部评分、年龄相关天数、家庭
 人数与车龄等核心变量，使用 min、mean、max、sum、var、median 函数，主要分组键包括
-"学历$\times$性别""家庭状况$\times$学历""家庭状况$\times$性别"及若干职业与地区组合。
+“学历$\times$性别”"家庭状况$\times$学历""家庭状况$\times$性别"及若干职业与地区组合。
 S2 只保留群组聚合原值，不构造 $x-\overline{x}_{g(i)}$ 形式的差值特征——差值保留到 S4。
 
 为了检验 Seedling 式的特征空间是否特别依赖非线性树模型，我们在同一套 379 维 S2 特征上额外
@@ -498,7 +499,7 @@ S6-stack & L2-Logistic stacking & 4 & 0.780383 & $-0.005959$ \\
   box/.style={draw,rounded corners,align=center,inner sep=4pt,font=\scriptsize},
   arr/.style={-{Stealth[length=2.0mm]},thick}
 ]
-\node[box,fill=gray!12]    (s1)    at (0,0)          {S1\\0.7576};
+\node[box,fill=gray!12]    (s1)    at (0,0.3)          {S1\\0.7576};
 \node[box,fill=yellow!18]  (b1)    at (3.2,2.6)      {B1\\0.7682};
 \node[box,fill=green!14]   (s3)    at (6.5,1.8)      {S3\\0.7851};
 \node[box,fill=blue!8]     (s4)    at (9.8,3.2)      {S4\\0.7862};
@@ -532,22 +533,6 @@ S6-stack & L2-Logistic stacking & 4 & 0.780383 & $-0.005959$ \\
 $-0.006$ 至 $-0.009$），因为 S3/S4/S5 预测高度相关（$\rho>0.978$）。在特征纵向叠加范式下，
 stacking 不产生增益，反而因为S2预测精度较低而产生负效应。
 
-同时在研究过程中，得到了以下四点关键发现：
-
-\begin{table}[h]
-\centering\small
-\caption{本实验四项核心发现。}
-\begin{tabular}{cll}
-\toprule
-编号 & 发现 & 数据支撑 \\
-\midrule
-1 & 最大提升来自关系型特征表示 & 五表历史聚合 $+0.01695$，信息增量最大 \\
-2 & 业务语义特征效率极高 & 仅7特征 $+0.01051$，密度为历史聚合3.6倍 \\
-3 & 后期精细化收益远小于早期 & 群体+最近 $+0.00106$，清洗/动态 $\approx 0$ \\
-4 & Stacking不产生增益 & 简单平均 $-0.009$，Logistic $-0.006$，$\rho>0.978$ \\
-\bottomrule
-\end{tabular}
-\end{table}
 
 我们最终认为 S5（191 维，OOF AUC 0.786342，Kaggle private 0.78696）为最优单模型。
 
