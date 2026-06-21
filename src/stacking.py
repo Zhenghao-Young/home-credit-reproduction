@@ -68,6 +68,10 @@ def main() -> None:
     _write_oof(output_dir, simple_avg_oof, "simple_average")
     _write_oof(output_dir, stack_oof, "logistic_stack")
 
+    # Validate OOF outputs (enforce project invariant)
+    validate_oof(simple_avg_oof, folds)
+    validate_oof(stack_oof, folds)
+
     _write_fold_metrics(results_dir, output_dir, simple_avg_oof, folds, "simple_average", SIMPLE_AVG_STAGE)
     _write_fold_metrics(results_dir, output_dir, stack_oof, folds, "logistic_stack", LOGISTIC_STACK_STAGE)
     _write_feature_names(output_dir)

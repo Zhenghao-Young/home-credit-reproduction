@@ -102,7 +102,7 @@ def _build_bureau_features(path: Path) -> pd.DataFrame:
             "DAYS_CREDIT",
         ],
     )
-    bureau["bureau_active_flag"] = bureau["CREDIT_ACTIVE"].ne("Closed").astype("float64")
+    bureau["bureau_active_flag"] = bureau["CREDIT_ACTIVE"].eq("Active").astype("float64")
     features = (
         bureau.groupby(ID_COLUMN, sort=False)
         .agg(
