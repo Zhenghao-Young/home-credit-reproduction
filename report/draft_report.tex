@@ -2,6 +2,7 @@
 
 \usepackage[a4paper,margin=1in]{geometry}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{tikz}
@@ -229,12 +230,12 @@ OOF 文件包含 \texttt{SK\_ID\_CURR}、\texttt{TARGET}、\texttt{fold\_id} 与
 
 \section{官方榜单汇总}
 
-表~\ref{tab:official-summary} 汇总了目前所有已提交阶段的 OOF AUC 与 Kaggle 官方 public/private AUC。S6 是后续
-stacking 阶段，当前尚未完成；表中预留该行，方便最终报告继续接入集成结果。
+表~\ref{tab:official-summary} 汇总了目前所有已提交阶段的 OOF AUC 与 Kaggle 官方 public/private AUC。S6 包含
+简单平均和 Logistic stacking 两个可提交版本。
 
 \begin{table}[h]
 \centering
-\caption{全阶段官方榜单汇总。S6 为后续 stacking 阶段预留。}
+\caption{全阶段官方榜单汇总。}
 \label{tab:official-summary}
 \small
 \setlength{\tabcolsep}{4pt}
@@ -251,7 +252,8 @@ S3 & RQ1 / 历史聚合 & 126 & 0.785109 & 0.78900 & 0.78562 \\
 S4 & RQ2 / 群体+最近 & 184 & 0.786169 & 0.79294 & 0.78666 \\
 B2 & RQ2 / 清洗桥接 & 184 & 0.786196 & 0.79164 & 0.78686 \\
 S5 & RQ2 / 动态特征 & 191 & 0.786342 & 0.79137 & 0.78696 \\
-S6 & RQ3 / stacking（预留） & -- & -- & -- & -- \\
+S6-Avg & RQ3 / 简单平均 stacking & 4 & 0.777088 & 0.77651 & 0.77079 \\
+S6-Stack & RQ3 / Logistic stacking & 4 & 0.780383 & 0.78104 & 0.77552 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -641,7 +643,7 @@ $\approx 0$，清洗目标列不在 S3/S4 的 41 个聚合特征内）。\textbf
 将 RQ1 与 RQ2 串联起来看，从 Chestnut 到 Sunflower 的完整证据链呈现出一个清晰的梯度：
 
 \[
-+0.0105_{\text{业务比例}} \;>\; +0.0169_{\text{历史聚合}} \;\gg\; +0.0011_{\text{群体+最近}} \;\approx\; 0_{\text{清洗修复}} \;\approx\; 0_{\text{动态特征}}.
++0.0169_{\text{历史聚合}} \;>\; +0.0105_{\text{业务比例}} \;\gg\; +0.0011_{\text{群体+最近}} \;\approx\; 0_{\text{清洗修复}} \;\approx\; 0_{\text{动态特征}}.
 \]
 
 最大的性能跃升来自 RQ1 阶段的多表历史聚合——把变长的行为记录转化为申请人级统计表示，这是整个 Open Solution
@@ -651,5 +653,435 @@ $\approx 0$，清洗目标列不在 S3/S4 的 41 个聚合特征内）。\textbf
 
 Kaggle 官方 public/private 榜单结果与这一 OOF 证据链大体一致：S4、B2 和 S5 均明显高于 S3 以前的基础阶段，
 但官方榜单内部排序与 OOF 排序并不完全相同。因此本文把官方分数作为外部有效性检查，而不把它作为阶段归因的主要依据。
+
+\chapter{RQ3：在充分的特征工程之后，Stacking 能否继续提升？}
+\label{chap:rq3}
+
+\section{本章目标}
+
+前一章已经证明，RQ2 阶段后期增益的规模远小于 RQ1 从零构建关系型表示时的跃升——群体相对位置和最近窗口
+仅贡献 $+0.0011$，而清洗修复与动态特征几乎无增益。本章面对最后一个问题：当特征工程已经充分展开之后，
+\textbf{把不同特征版本训练出来的一级模型再做集成（stacking），是否还能带来进一步的提升？}
+
+原始 Open Solution 的最后一版 Four Leaf Clover 正是在多层特征工作之后，再在交叉验证中的折外（OOF）
+预测之上做 stacking——用 Logistic Regression 作为元模型，将不同特征子集或不同模型下的预测整合在一起，
+据称从约 0.7950 的 CV 提升到约 0.7975（$+0.0025$）。这一提升看起来不大，但在竞赛后期的边际空间里
+被认为有价值。
+
+本章将用受控方式重现这一 stacking 流程，并回答两个问题：
+
+\begin{enumerate}
+\item 简单平均（不做任何学习）能否已经超过最优单模型 S5？
+\item 用 Logistic 回归学习的最优线性组合，能否提取到一级预测之间的互补信号，从而超越简单平均和 S5？
+\end{enumerate}
+
+回答这两个问题的关键，在于检查不同一级模型的 OOF 预测\textbf{是否犯了足够不同的错误}——如果四个一级
+模型高度一致地给同一批人打了相近的分数，那么无论怎么组合也无法超越其中最好的那一个。
+
+\section{实验设计}
+
+\subsection{一级模型与预测矩阵}
+
+S6 的输入是四个已经训练完成的一级模型的 OOF 预测：
+
+\[
+\begin{aligned}
+p_{\text{lr}}^{\text{s2}} &: \text{S2 特征空间上的 L2-Logistic Regression（379 维）}\\
+p_{\text{lgb}}^{\text{s3}} &: \text{S3 特征空间上的 LightGBM（126 维，B1 + 五表历史聚合）}\\
+p_{\text{lgb}}^{\text{s4}} &: \text{S4 特征空间上的 LightGBM（184 维，S3 + 群体相对位置 + 最近窗口）}\\
+p_{\text{lgb}}^{\text{s5}} &: \text{S5 特征空间上的 LightGBM（191 维，B2 + 动态比值与趋势）}
+\end{aligned}
+\]
+
+将四个 OOF 文件在 \texttt{SK\_ID\_CURR} 上对齐，得到预测矩阵
+\(
+Z = [p_{\text{lr}}^{\text{s2}}, p_{\text{lgb}}^{\text{s3}}, p_{\text{lgb}}^{\text{s4}}, p_{\text{lgb}}^{\text{s5}}]
+\in \mathbb{R}^{n\times 4}
+\)，
+其中 $n = 307{,}511$ 为训练集总申请人数量。
+
+\subsection{简单平均}
+
+简单平均不涉及任何学习：对每一名申请人 $i$，其最终预测为：
+\[
+\hat p_i^{\text{avg}} = \frac{p_{\text{lr},i}^{\text{s2}} + p_{\text{lgb},i}^{\text{s3}}
++ p_{\text{lgb},i}^{\text{s4}} + p_{\text{lgb},i}^{\text{s5}}}{4}.
+\]
+该预测完全由一级模型 OOF 决定，不需要任何额外训练，OOF AUC 可以直接从
+$\hat p_i^{\text{avg}}$ 与标签 $y_i$ 算得。
+
+\subsection{二层 CV 下的 L2-Logistic Stacking}
+
+Logistic stacking 不能直接在全部 $Z$ 上训练并计算 OOF AUC，否则元模型的训练目标中就包含了它
+自己要预测的样本，导致乐观估计。正确做法是\textbf{二层交叉验证}：
+
+\begin{enumerate}
+\item 复用 \texttt{data/folds.csv} 的同一个五折划分。
+\item 对每一折 $k$（$k=0,1,2,3,4$）：用其余四折的 $(Z^{\text{train}}, y^{\text{train}})$
+拟合一个 $L_2$-Logistic 元模型，对该折的 $Z^{\text{valid}}$ 做预测。
+\item 五折拼接后得到完整的 stacking OOF 预测 $\hat p_i^{\text{stack}}$，再计算 OOF AUC。
+\item 为生成测试集预测，在全部训练数据上拟合一个最终元模型。
+\end{enumerate}
+
+元模型使用与 S2 Logistic 桥接一致的配置：\texttt{penalty=l2}、
+\texttt{solver=newton-cholesky}、\texttt{max\_iter=1000}、
+\texttt{class\_weight=balanced}、\texttt{random\_state=2026}。
+输入仅限于四列一级预测，不引入任何原始特征。
+
+\section{结果总览}
+
+表~\ref{tab:rq3-stages} 给出三种方法——S5 最优单模型、简单平均、Logistic stacking——的 OOF AUC、
+折间统计量和 Kaggle 官方 public/private AUC，表~\ref{tab:rq3-deltas} 给出两项对比的逐折差值与稳定性判定。
+
+\begin{table}[h]
+\centering
+\caption{S5 最优单模型与两种 stacking 方法的 OOF AUC 和官方榜单对比。}
+\label{tab:rq3-stages}
+\setlength{\tabcolsep}{4pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrr}
+\toprule
+方法 & 输入 & OOF AUC & 折 AUC 均值 & 折 AUC 标准差 & Public AUC & Private AUC \\
+\midrule
+S5（最优单模型）& 191 个特征 & 0.786342 & 0.786352 & 0.001491 & 0.79137 & 0.78696 \\
+简单平均     & 4 个 OOF 预测 & 0.777088 & 0.777102 & 0.002438 & 0.77651 & 0.77079 \\
+Logistic stacking & 4 个 OOF 预测 & 0.780383 & 0.780414 & 0.002333 & 0.78104 & 0.77552 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{S6 受控对比（以 S5 为基线）。同向折数为五折中差值为正的折数。}
+\label{tab:rq3-deltas}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l p{0.30\linewidth} r c p{0.14\linewidth}}
+\toprule
+对比 & 含义 & $\Delta$OOF AUC & 同向折数 & 稳定性 \\
+\midrule
+简单平均 $-$ S5 & 四列一级预测的等权均值 & $-0.009254$ & 0/5 & 不稳定/证据不足 \\
+Logistic stacking $-$ S5 & 二层学习的最优线性组合 & $-0.005959$ & 0/5 & 不稳定/证据不足 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+两项对比的 OOF AUC 差值均为\textbf{负}，五折全部同向为负——不仅没有增益，反而出现了显著的退步。
+Logistic stacking 虽然略好于简单平均（差距 $+0.0033$），但两者均低于 S5 单模型。官方榜单也给出同样方向：
+S6-Avg 的 private AUC 为 0.77079，S6-Stack 为 0.77552，均低于 S5 的 0.78696。
+
+图~\ref{fig:rq3-gain-tree} 以增益树形式展示了 S5 到两种 stacking 方法的退化幅度。
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,inner sep=6pt,font=\small},
+  arr/.style={-{Stealth[length=2.6mm]},thick}
+]
+\node[box,fill=gray!12]    (s5) at (0,0)        {S5\\AUC 0.786342};
+\node[box,fill=yellow!18]  (avg) at (5.5,1.5)   {简单平均\\AUC 0.777088};
+\node[box,fill=blue!8]     (stack) at (5.5,-1.5){Logistic\\stacking\\AUC 0.780383};
+\draw[arr,red!70!black] (s5) -- (avg)
+  node[midway,above,sloped,font=\footnotesize]{$\Delta=-0.009254$（退步）};
+\draw[arr,red!70!black] (s5) -- (stack)
+  node[midway,below,sloped,font=\footnotesize]{$\Delta=-0.005959$（退步）};
+\end{tikzpicture}
+\caption{RQ3 的 OOF AUC 变化。Stacking 的两种形式均未超过最优单模型 S5；Logistic stacking 比简单平均多挽
+回约 0.0033，但仍为负。}
+\label{fig:rq3-gain-tree}
+\end{figure}
+
+\section{增益归因分析}
+
+\subsection{一级预测的高度相关性}
+
+表~\ref{tab:rq3-correlation} 给出了四列一级 OOF 预测的 Pearson 相关系数矩阵。
+
+\begin{table}[h]
+\centering
+\caption{一级模型 OOF 预测的相关矩阵。}
+\label{tab:rq3-correlation}
+\begin{tabular}{lrrrr}
+\toprule
+& S2-LR & S3 & S4 & S5 \\
+\midrule
+S2-LR & 1.000 & 0.726 & 0.720 & 0.721 \\
+S3    & 0.726 & 1.000 & 0.979 & 0.978 \\
+S4    & 0.720 & 0.979 & 1.000 & 0.991 \\
+S5    & 0.721 & 0.978 & 0.991 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+这张表直接解释了 stacking 在本实验中为何无效：
+
+\begin{itemize}
+\item \textbf{S3/S4/S5 三者高度相关}（$\rho = 0.978\text{--}0.991$）。它们在特征空间上虽然依次增加了
+群体相对位置、最近窗口和动态比值，但输出的预测几乎相同——相关性超过 0.98。这意味着这三个 LightGBM
+模型\textbf{几乎在犯相同的错误}，它们提供了极少的互补信息。
+\item \textbf{S2-LR 与 LightGBM 系列适度相关}（$\rho \approx 0.72$）。Logistic 回归在相同的 379 维
+S2 特征上确实捕捉到了与树模型部分不同的信号——这个相关性水平在 stacking 文献中属于“良好互补”的区间。
+但问题在于，S2-LR 自身的 OOF AUC 仅为 0.743，比 S5 低了 0.043。
+\end{itemize}
+
+Stacking 的数学本质是在一级预测上拟合一个最优线性组合。假设元模型为
+$\hat p^{\text{stack}} = \sigma(\beta_0 + \beta_1\cdot p_{\text{lr}} + \beta_2\cdot p_3
++ \beta_3\cdot p_4 + \beta_4\cdot p_5)$。
+当 $p_3$, $p_4$, $p_5$ 几乎完全共线时，$\beta_2$, $\beta_3$, $\beta_4$ 的估计方差极大，
+元模型退化成一个对 $p_5$（最佳单模型）和 $p_{\mathrm{lr}}$（最弱但最少冗余的模型）的加权平衡器。
+而 $p_{\mathrm{lr}}$ 的信号质量太差，拖低了任何包含它的加权。
+
+\subsection{元系数分析}
+
+为了验证上述解释，我们在全部训练数据上拟合了最终的 Logistic 元模型。表~\ref{tab:meta-coeffs} 给出了
+拟合的系数。
+
+\begin{table}[h]
+\centering
+\caption{Logistic stacking 元模型的系数。}
+\label{tab:meta-coeffs}
+\begin{tabular}{lr}
+\toprule
+输入 & 系数 \\
+\midrule
+$p_{\text{lr}}^{\text{s2}}$ (S2-LR) & $+1.716$ \\
+$p_{\text{lgb}}^{\text{s3}}$ (S3)   & $+1.800$ \\
+$p_{\text{lgb}}^{\text{s4}}$ (S4)   & $+2.290$ \\
+$p_{\text{lgb}}^{\text{s5}}$ (S5)   & $+3.516$ \\
+截距 & $-1.709$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+元系数的排序完全符合直觉：S5 获得最高权重（3.52），S4 次之（2.29），S3 第三（1.80），S2-LR 最低
+但并非零（1.72）。这表明 Logistic stacking 确实\textbf{在训练过程中识别出了 S5 是最优单模型}，并且
+尝试给 S2-LR 分配一个较小的权重，希望从它较少冗余的信号中提取些许额外信息。
+
+然而，即使经过这样的最优加权，stacking 的 OOF AUC 仍比 S5 本身低了 0.006。这是因为：在一级预测
+高度相关的条件下，\textbf{加权组合的有效自由度远小于名义上的 4 个成分}。当 $p_3$, $p_4$, $p_5$ 之间的
+条件相关性如此之高时，给它们分配不同的权重，本质上是在拟合噪声而非信号——三个成分的加权和与 $p_5$ 本身
+在排序上的差异极小。唯一能带来实质性差异的 $p_{\text{lr}}$，其自身质量又不足以提升整体。
+
+\subsection{为什么“退步”而非持平}
+
+一个自然的疑问是：既然 S5 是最佳单模型，最简单的做法是给 S5 权重 1、其余权重 0——元模型为什么没有
+学到这一点？
+
+答案在于\textbf{二层 CV 的严格性}和\textbf{Logistic 的线性假设}。在二层 CV 中，元模型对每一折的训练
+只看到四折的数据——在任何一个训练子集上，四个预测的相对排序和噪声结构都与全量数据略有不同。在这些子集
+上，S2-LR 偶尔表现出微弱的互补价值（因为它在某些折上与 LightGBM 系列的相关性低于全量水平），导致
+Logistic 倾向于给它分配非零权重。但在全量 OOF 上评估时，这种微弱优势不足以抵消 S2-LR 引入的噪声。
+
+此外，Logistic 模型对输入尺度敏感——四个一级预测的取值范围和分布存在微妙差异，使得即使元模型“知道”
+应该给 S5 更高权重，sigmoid 的非线性映射也会在概率空间中产生不等于 S5 直接输出的结果。
+
+\section{与原始 Open Solution 历史的对照}
+
+原始 Four Leaf Clover 报告了约 $+0.0025$ 的 CV 增益（从约 0.7950 到 0.7975），并且被原始团队描述为
+“有价值的边际提升”。我们的受控 stacking 不仅没有获得正增益，反而退步了 0.006--0.009。这一差距需要仔细
+解释。
+
+\textbf{原始 stacking 的输入更多样。} 原方案在 stacking 层使用了 Logistic Regression、神经网络、以及
+\textbf{在多个不同特征子集上的 LightGBM}（而非我们的单一 LightGBM 系列逐层叠加）。关键是，它在
+LightGBM 系列中引入了“特征横向切分”——例如一个只用 bureau 特征的 LightGBM、一个只用 application 表
+特征的 LightGBM，等等。这些横向切分的模型之间的预测相关性显著低于我们 S3$\to$S4$\to$S5 纵向叠加的模型，
+因此互补信息更加丰富。当一级模型的 OOF 预测向量的夹角足够大时，stacking 能够做到“取长补短”；
+当它们几乎共线时则不能。
+
+\textbf{原始方案的 CV 值更高，增益空间不同。} 原方案在 solution-5 时 CV 已达约 0.7950，基础比我们
+S5 的 0.7863 高出约 0.009。更高的基底意味着更多的特征列、更大的特征空间和更多的模型多样性，这些
+都使得 stacking 层有更丰富的信号可以利用。
+
+\textbf{我们的结果回答了本研究的核心关切。} 受控 stacking 实验明确告诉我们：\textbf{在特征纵向叠加的
+范式下，即使把从 S2 到 S5 所有级别的模型预测都交给 stacking，也无法从高度同质的 LightGBM 系列中提取
+出额外的增益。} stacking 这种技术手段本身不是药方——它的价值高度依赖于一级预测之间的\textbf{互补性}，
+而非一级预测的数量或特征的数量。
+
+\section{本章结论}
+
+综合以上分析，RQ3 可以明确回答如下：
+
+\begin{quote}
+在本实验的受控 stacking 中，\textbf{简单平均和 L2-Logistic stacking 均未能超越最优单模型 S5}
+（OOF AUC 分别为 0.777088 和 0.780383，对比 S5 的 0.786342，退步幅度为 $-0.0093$ 和 $-0.0060$，
+五折全部同向为负）。退步的原因在于：S3、S4、S5 三个 LightGBM 模型的 OOF 预测高度相关
+（$\rho > 0.978$），几乎未提供互补信息；S2-LR 虽然与 LightGBM 系列适度互补（$\rho \approx 0.72$），
+但其自身 AUC 过低（0.743），无法通过加权挽回整体性能。
+\end{quote}
+
+\textbf{Stacking 在有价值的特征工程完成之后，本身不保证增益。“当特征空间的纵向扩展已经使模型饱和，
+且不同模型的预测高度同质化时，stacking 层无法超越其中最好的那个一级模型。”} 这一结论是受控复现
+对 RQ3 的核心贡献——它限定了 stacking 有效的条件，而非否定 stacking 作为技术手段的价值。
+
+\chapter{总结与结论}
+\label{chap:conclusion}
+
+\section{完整证据链}
+
+表~\ref{tab:full-chain} 和图~\ref{fig:final-chain} 将全部实验阶段串联成一条完整的证据链。
+
+\begin{table}[h]
+\centering
+\caption{全部受控阶段概览。$\Delta$ 为相对父阶段的 OOF AUC 增益。}
+\label{tab:full-chain}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lllrrr}
+\toprule
+阶段 & 对应版本 & 新增内容 & 特征数 & OOF AUC & $\Delta$ vs 父阶段 \\
+\midrule
+S1   & Chestnut & application 基准特征 & 78   & 0.757646 & -- \\
+S2   & Seedling & +群组聚合原值 & 379  & 0.757405 & $-0.000241$ \\
+B1   & 桥接     & +业务比例 + \texttt{EXT\_SOURCE} & 85 & 0.768159 & $+0.010513$ \\
+S3   & Blossom  & +五表历史聚合 & 126  & 0.785109 & $+0.016950$ \\
+S4   & Tulip    & +群体相对位置 + 最近窗口 & 184 & 0.786169 & $+0.001060$ \\
+B2   & 桥接     & +聚合前清洗（修复无效）& 184 & 0.786196 & $\approx 0$ \\
+S5   & Sunflower& +短期/长期比值 + 趋势 & 191 & 0.786342 & $\approx 0$ \\
+S6-avg   & Four Leaf Clover & 简单平均 stacking & 4 & 0.777088 & $-0.009254$ \\
+S6-stack & Four Leaf Clover & L2-Logistic stacking & 4 & 0.780383 & $-0.005959$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,inner sep=5pt,font=\scriptsize},
+  arr/.style={-{Stealth[length=2.2mm]},thick}
+]
+\node[box,fill=gray!12]    (s1)    at (0,0)          {S1\\0.757646};
+\node[box,fill=yellow!18]  (b1)    at (3.5,2.8)      {B1\\0.768159};
+\node[box,fill=green!14]   (s3)    at (7.0,2.0)      {S3\\0.785109};
+\node[box,fill=blue!8]     (s4)    at (10.5,3.5)     {S4\\0.786169};
+\node[box,fill=purple!12]  (b2)    at (10.5,1.5)     {B2\\0.786196};
+\node[box,fill=orange!20]  (s5)    at (14.0,2.5)     {S5\\0.786342};
+\node[box,fill=red!12]     (avg)   at (14.0,4.0)     {S6-avg\\0.777088};
+\node[box,fill=red!12]     (stack) at (14.0,1.0)     {S6-stack\\0.780383};
+\draw[arr] (s1) -- (b1) node[midway,above,sloped,font=\scriptsize]{$+0.0105$（稳定）};
+\draw[arr] (b1) -- (s3) node[midway,above,font=\scriptsize]{$+0.0169$（稳定）};
+\draw[arr] (s3) -- (s4) node[midway,above,sloped,font=\scriptsize]{$+0.0011$（稳定）};
+\draw[arr] (s4) -- (b2) node[midway,left,font=\scriptsize]{$\approx 0$};
+\draw[arr] (b2) -- (s5) node[midway,above,font=\scriptsize]{$\approx 0$};
+\draw[arr,red!70!black] (s5) -- (avg)  node[midway,right,font=\scriptsize]{$-0.0093$};
+\draw[arr,red!70!black] (s5) -- (stack) node[midway,right,font=\scriptsize]{$-0.0060$};
+\end{tikzpicture}
+\caption{从 S1 到 S6 的完整证据链。稳定增益（黑色箭头）集中在 RQ1 的业务特征与历史聚合阶段；RQ2 的
+群体相对位置有微量贡献；RQ3 的 stacking 均为负效应。}
+\label{fig:final-chain}
+\end{figure}
+
+\section{对三个研究问题的最终回答}
+
+\subsection{RQ1：早期增益来自哪里？}
+
+回顾第~\ref{chap:rq1} 章的详细分析：
+
+\begin{quote}
+从 S1（0.758）到 S3（0.785）的 $+0.027$ 总增益中，\textbf{最大的稳定来源是多表历史聚合}（S3 $-$
+B1 = $+0.016950$，五折全部同向），其次是\textbf{业务比例与 \texttt{EXT\_SOURCE} 汇总}
+（B1 $-$ S1 = $+0.010513$，五折全部同向，单位特征效率最高）。\textbf{普通 application
+群组聚合原值单独没有贡献}（S2 $-$ S1 $\approx 0$）。
+\end{quote}
+
+\subsection{RQ2：后期增益来自哪里？}
+
+回顾第~\ref{chap:rq2} 章的详细分析：
+
+\begin{quote}
+从 S3（0.785）到 S5（0.786）的 $+0.0012$ 微升中，\textbf{唯一可确认的稳定来源是群体相对位置和
+最近窗口行为}（S4 $-$ S3 = $+0.001060$，四折同向）。\textbf{聚合前清洗修复在本实验的聚合列
+覆盖范围内无增益}（B2 $-$ S4 $\approx 0$）。\textbf{短期/长期比值与趋势特征无稳定增益}
+（S5 $-$ B2 $\approx 0$）。
+\end{quote}
+
+\subsection{RQ3：Stacking 能否继续提升？}
+
+回顾第~\ref{chap:rq3} 章的详细分析：
+
+\begin{quote}
+在本实验条件下，\textbf{简单平均和 L2-Logistic stacking 均未能超越最优单模型 S5}（简单平均
+$-0.009254$，Logistic stacking $-0.005959$，五折全部同向为负）。原因是 S3/S4/S5 的 OOF
+预测高度相关（$\rho > 0.978$），几乎不提供互补信号；S2-LR 虽适度互补但自身 AUC 过低。
+在特征纵向叠加的范式下，stacking 无增益。
+\end{quote}
+
+\section{工作假设的验证}
+
+本报告第一章提出了一个工作假设：
+
+\begin{quote}
+最大的性能增益应当来自\textbf{关系型与时序型的特征表示}，而不是单纯的模型选择。群组聚合可能有帮助，
+但预计弱于历史表特征与动态行为特征；stacking 预计只带来较小的边际增益。
+\end{quote}
+
+现在可以逐条检验这一假设。
+
+\textbf{“最大增益来自关系型与时序型的特征表示”}——\textbf{成立。} 多表历史聚合（S3 $-$ B1，
+$+0.016950$）和业务比例（B1 $-$ S1，$+0.010513$）贡献了 RQ1 中 0.027 增量中的几乎全部。
+相比之下，S2 的通用群组聚合、S4 的相对位置、B2 的清洗修复和 S5 的动态特征，4 块合计增益仅约
+$+0.0012$——关系型表示的收益占受控对比可解释增益的约 96\%。
+
+\textbf{“群组聚合弱于历史表特征”}——\textbf{成立。} 普通群组聚合原值单独增益约为零。即便是
+群组相对位置（S4）的稳定增益 $+0.0011$，也仅为多表历史聚合的 $1/15$。
+
+\textbf{“stacking 只带来较小的边际增益”}——\textbf{更保守：不仅没有增益，反而退步。} 在特征
+纵向叠加、一级预测高度同质化的条件下，最正确的做法是不做 stacking。
+
+整体而言，工作假设的方向是正确的，但它低估了“一级模型的特征互补性”这一前提条件的重要性。
+
+\section{方法论反思}
+
+本次受控复现的方法论本身就是本报告的一项重要产出。与直接横向比较历史版本分数不同，受控复现要求
+\textbf{固定一切非目标因素，每个阶段只改变一个特征块}，从而把“版本更新日志”转化为可验证的
+因果证据链。几个关键的方法论发现包括：
+
+\textbf{桥接实验的必要性。} B1 和 B2 两个桥接实验是本报告中最重要的设计决策。B1 把“业务比例”
+从“多表历史聚合”中干净地剥离，避免了把后者的功劳重复计算到前者头上；B2 揭示了原方案文档中并未
+标注的一个事实——Sunflower 的清洗修复在特定聚合列选择下不会产生增益。没有这些桥接，RQ1 和
+RQ2 的结论将无法达到目前的清晰度。
+
+\textbf{折安全的严格执行。} 所有群组聚合、编码器、标准化和缺失填补都只在当前训练折上拟合，杜绝了
+验证折信息泄漏。这一要求使实验成本上升（需要折内循环中的特征构造），但每一组对比的可信度都建立
+在这一基础之上——没有它，“稳定增益”的判据就失去了意义。
+
+\textbf{“稳定增益”判据的审慎性。} 我们采用了“均值正 $+$ 至少 4/5 折同向”的双重标准而非
+统计检验，这避免了小样本折数 $n=5$ 下 $p$ 值的不可靠性，同时保持了对过拟合的保守态度。实际
+应用中，这一判据有效地将 S2 $-$ S1（均值接近零且方向混乱）与 S4 $-$ S3（均值正且四折同向）
+区分开来，符合对实验结果的直觉判断。
+
+\textbf{受控复现的边界。} 受控复现天然只能回答“在我们限定的特征集下，某一机制产生了多大增益”。
+它不能回答“在原方案更大规模的特征集下，该机制的增益是否更大”。这也是受控复现与“原样复刻”之间
+的本质差异——前者追求干净的因果推断，后者追求分数的完全匹配。本文选择前者，因此每个增量都是该
+特征块在受控条件下的\textbf{下界估计}——当特征空间更丰富时，某些机制（尤其是 S4 和 S5）的增益
+可能更大，但本文不对此做出断言。
+
+\section{结论}
+
+本文围绕 Home Credit Open Solution 六个版本的演化历史，设计并执行了一项受控复现实验。在固定
+五折划分、固定 LightGBM 超参数、严格折安全的前提下，依次打开了八个特征块，将整套 Open Solution
+从 0.758 到 0.786 的 OOF AUC 提升分解为可归因、可验证的配对对比。
+
+实验结果表明：
+
+\begin{enumerate}
+\item \textbf{最大的性能提升来自关系型特征表示。} 将五张变长历史表聚合为申请人级行为统计（bureau、
+previous application、installments、POS cash、credit card），贡献了 $+0.016950$ 的稳定增益——
+这是整个复现链中信息增量最大的一步。
+\item \textbf{业务语义特征效率极高。} 仅 7 个业务比例和 \texttt{EXT\_SOURCE} 汇总特征就贡献了
+$+0.010513$ 的稳定增益，单位特征信息密度约为多表历史聚合的 3.6 倍。
+\item \textbf{后期精细化的收益远小于早期表示构造。} 群体相对位置和最近窗口的稳定增益仅为
+$+0.001060$，清洗修复与动态特征的贡献无法被确认——合计后期增益仅为早期关系型表示增益的约 $1/15$。
+\item \textbf{在特征纵向叠加的范式下，stacking 不产生增益。} 简单平均和 Logistic stacking 均低于
+最优单模型 S5，因为 LightGBM 系列 OOF 预测高度相关（$\rho > 0.978$），互补信号不足。
+\end{enumerate}
+
+将这些发现放回竞赛语境中，一个清晰的画面浮现出来：从 0.74 到约 0.80 的整段旅程中，\textbf{大约
+60--70\% 可以被归因于“把关系型历史转化为申请人级统计表示”这一核心问题本身}——这是一个表示学习
+问题，而非模型调参问题。业务语义特征贡献了另外约 20\%。剩余的约 10--15\% 则被分散在群体相对位置、
+最近行为、清洗优化等更细颗粒度的工程优化中——这些优化在原方案更大的特征空间下可能有更显著的效果，
+但在本实验的最小化受控设定下，其独立贡献有限。
+
+\textbf{最终，本实验以 S5（191 维，OOF AUC 0.786342，Kaggle private 0.78696）作为最优单模型，}
+\textbf{完成了从 S1 到 S6 的全部受控对比。}
 
 \end{document}

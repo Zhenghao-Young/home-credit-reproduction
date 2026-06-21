@@ -1,0 +1,6 @@
+feature,coefficient,intercept
+p_lr_s2,1.7159725547225708,False
+p_lightgbm_s3,1.7995863072214469,False
+p_lightgbm_s4,2.2901624120646438,False
+p_lightgbm_s5,3.5157472587776204,False
+intercept,-1.7088432231648814,True

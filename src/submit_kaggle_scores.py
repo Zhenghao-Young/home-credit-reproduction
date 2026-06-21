@@ -139,7 +139,12 @@ def _submission_candidates(summary: pd.DataFrame) -> pd.DataFrame:
 
 
 def _submission_path(row: pd.Series) -> Path:
-    return Path(str(row["output_dir"])) / "submission.csv"
+    stage_submission_files = {
+        "s6_avg": "submission_simple_average.csv",
+        "s6_stack": "submission_logistic_stack.csv",
+    }
+    file_name = stage_submission_files.get(str(row["stage"]), "submission.csv")
+    return Path(str(row["output_dir"])) / file_name
 
 
 def _submission_message(row: pd.Series, run_id: str) -> str:

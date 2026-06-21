@@ -12,16 +12,16 @@
 
 ## 现在有什么
 
-当前已完成公共实验骨架、RQ1 和 RQ2 的受控实验阶段，并已把 S1 到 S5
-的 9 个可提交版本提交到 Kaggle 官方榜单：
+当前已完成公共实验骨架、RQ1、RQ2 和 RQ3 的受控实验阶段，并已把 S1 到 S6
+的全部可提交版本提交到 Kaggle 官方榜单：
 
 | 模块 | 当前状态 |
 | --- | --- |
 | 数据 | 原始 Kaggle 数据放在 `data/original/`，该目录已被 Git 忽略；固定折划分为 `data/folds.csv`。 |
-| 代码 | `src/` 下已有固定折、指标校验、训练入口、S1/S2 application 特征、B1 业务特征、S3 历史表聚合、S4 群体/最近窗口特征、B2 清洗桥接和 S5 动态特征。 |
-| 结果 | 已有 `results/s1/`、`results/s2/`、`results/s2_full/`、`results/s2_logistic/`、`results/b1/`、`results/s3/`、`results/s4/`、`results/b2/`、`results/s5/`、`results/rq1/` 和 `results/rq2/`；项目汇总和 Kaggle 官方分数见 `results/summary.csv`。 |
+| 代码 | `src/` 下已有固定折、指标校验、训练入口、S1/S2 application 特征、B1 业务特征、S3 历史表聚合、S4 群体/最近窗口特征、B2 清洗桥接、S5 动态特征和 S6 stacking。 |
+| 结果 | 已有 `results/s1/`、`results/s2/`、`results/s2_full/`、`results/s2_logistic/`、`results/b1/`、`results/s3/`、`results/s4/`、`results/b2/`、`results/s5/`、`results/s6/`、`results/rq1/`、`results/rq2/` 和 `results/rq3/`；项目汇总和 Kaggle 官方分数见 `results/summary.csv`。 |
 | 参考实现 | `open-solution/` 是上游解答 submodule，只读参考，不在其中改代码。 |
-| 报告 | `report/draft_report.tex` 和 `report/draft_report.pdf` 已包含第 1--4 章草稿，其中第 3 章完成 RQ1 分析，第 4 章完成 RQ2 分析。 |
+| 报告 | `report/draft_report.tex` 和 `report/draft_report.pdf` 已覆盖 RQ1、RQ2、RQ3 与最终总结。 |
 
 旧的 `home-credit-default-risk/` 数据占位目录已废弃；当前默认数据入口是 `data/original/`。
 

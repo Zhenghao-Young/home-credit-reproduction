@@ -1,0 +1,552 @@
+\documentclass[12pt,UTF8,fontset=windows]{ctexart}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{enumitem}
+\usepackage{caption}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
+
+\pagestyle{plain}
+
+% 约1.2倍行距
+\setstretch{1.13}
+\setlength{\parskip}{2pt plus 1pt}
+\setlength{\parskip}{0pt plus 1pt}
+\setlength{\parindent}{2em}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{2pt}
+\setlength{\intextsep}{4pt}
+\setlength{\textfloatsep}{8pt}
+\setlength{\floatsep}{6pt}
+\setlength{\abovedisplayskip}{8pt}
+\setlength{\belowdisplayskip}{8pt}
+\setlength{\abovedisplayshortskip}{4pt}
+\setlength{\belowdisplayshortskip}{4pt}
+\setlength{\jot}{4pt}
+
+% OOF公式行距略宽
+\everydisplay{\setstretch{1.2}}
+\setlength{\emergencystretch}{3em}
+\sloppy
+\setlist{nosep,leftmargin=2em,labelindent=0pt}
+
+% 章标题四号(14pt)加粗居左；小标题小四(12pt)加粗居左
+\ctexset{
+  section={
+    beforeskip=14pt, afterskip=8pt,
+    format={\Large\bfseries\raggedright}, numbering=true,
+  },
+  subsection={
+    beforeskip=12pt, afterskip=6pt,
+    format={\normalsize\bfseries\raggedright}, numbering=true,
+  },
+}
+
+\begin{document}
+
+% ═══ 首页 ═══
+\begingroup
+\centering
+\vspace{24pt}
+{\LARGE\bfseries《工程数据分析》课程项目报告}\\[6pt]
+{\large\bfseries --Home Credit Open Solution 的受控复现--}\\[10pt]
+{\normalsize \today}
+\par
+\endgroup
+\vspace{4pt}
+
+% ═══ 1  小组分工 ═══
+\section{小组分工}
+
+\begin{table}[h]
+\centering\small
+\caption{小组成员与分工}
+\begin{tabular}{cl}
+\toprule
+姓名 & 主要工作 \\
+\midrule
+杨铮昊 & 实验基础设施、S1基线、S2群组聚合、S2-Logistic，报告第2章素材 \\
+杨家骅 & B1业务特征、S3历史聚合，问题一分析，报告第3章素材 \\
+蒙帮睿智 & S4群体相对+最近窗口、B2清洗、S5动态特征，问题二分析，报告第4章素材 \\
+杨译坤 & S6 stacking、预测相关性分析，问题三分析，第5--6章素材，最终报告整理与撰写 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ═══ 2  问题背景与受控复现设计 ═══
+\section{问题背景与受控复现设计}
+
+\subsection{问题背景}
+
+Home Credit Default Risk 竞赛要求预测贷款申请人是否会出现还款困难。每名申请人由 \texttt{SK\_ID\_CURR} 唯一标识，二元标签 \texttt{TARGET} 在出现还款困难时取 1。评价指标是 ROC 曲线下面积（AUC），它衡量的是模型给高风险申请人赋予更高预测概率的排序能力，而不是某个固定阈值下的分类准确率。
+
+
+这份数据不是一张扁平的单表，而是一组关系型表格。中心 application 表每名申请人占一行，含
+基本信息、收入、资产、家庭等静态字段；其余五张表分别记录：\texttt{bureau}（征信局历史，含
+贷款金额、状态、逾期金额）、\texttt{previous\_application}（历史贷款申请，含申请金额、审批
+结果）、\texttt{installments\_payments}（分期还款明细，含应还/实还金额、逾期天数）、
+\texttt{POS\_CASH\_balance}（POS 与现金贷款月度余额，含逾期状态 SK\_DPD）、
+\texttt{credit\_card\_balance}（信用卡月度余额，含额度、使用金额）。核心建模难点不只是“训练一个分类器”，更在于如何把变长的历史记录转化为申请人级别的特征——这一步“表示构造”
+练一个分类器”，更在于如何把变长的历史记录转化为申请人级别的特征——这一步“表示构造”
+决定了模型最终能“看到”哪些信息。
+
+开源方案 \texttt{minerva-ml/open-solution-home-credit} 经历了六个有名称的版本（表~\ref{tab:versions}）：
+Chestnut（单表基线）、Seedling（群组聚合与多模型）、Blossom（多表历史聚合）、Tulip（群体相对
+与近期行为）、Sunflower（清洗修复与动态特征）、Four Leaf Clover（OOF stacking），公开榜 AUC
+从约 0.74 升至约 0.80。但这些版本不能直接当作受控实验来比较——相邻版本间特征工程、
+清洗规则、模型类别与超参数往往同时变化，分数提升无法干净归因。
+
+\begin{table}[h]
+\centering\small
+\caption{作为项目参照的历史 Open Solution 版本。}\label{tab:versions}
+\begin{tabular}{p{0.15\textwidth}p{0.38\textwidth}p{0.35\textwidth}}
+\toprule
+版本 & 主要变化 & 在本项目中的角色 \\
+\midrule
+Chestnut & application 单表基线 & S1 基线 \\
+Seedling & application 群组聚合与更多模型 & S2 群组聚合 \\
+Blossom & 多张历史表的聚合特征 & S3 历史信息 \\
+Tulip & 群体相对特征与近期行为 & S4 更精细的表示 \\
+Sunflower & 清洗修复与动态特征 & B2/S5 清洗与动态 \\
+Four Leaf Clover & 在 OOF 预测上做 stacking & S6 模型集成 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+本项目的核心问题是当开源解答分数提升时，究竟是哪一类新增的信息结构带来了增益？ 由此引出了我们的三个研究
+问题（Research Question），分别为：
+
+\begin{enumerate}
+\item 问题一：从 Chestnut 到 Blossom 的早期增益来自哪里？
+\item 问题二：从 Blossom 到 Sunflower 的后期增益来自哪里？
+\item 问题三：充分的特征工程之后，stacking 能否继续提升？
+\end{enumerate}
+
+\subsection{实验矩阵}
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{受控特征阶段与对应原版本。}\label{tab:matrix}
+\begin{tabular}{llp{0.38\textwidth}l}
+\toprule
+阶段 & 对应版本 & 特征内容 & 目的 \\
+\midrule
+S1   & Chestnut       & application 数值+类别（78 列） & 基线 \\
+S2   & Seedling       & S1 + 群组聚合原值（379 列）    & 群组聚合 \\
+B1   & 桥接           & S1 + 业务比例+EXT\_SOURCE 汇总（85 列） & 业务特征 \\
+S3   & Blossom        & B1 + 五表历史聚合（126 列）     & 历史信息 \\
+S4   & Tulip          & S3 + 群体相对位置+最近窗口（184 列） & 精细表示 \\
+B2   & 桥接           & S4，聚合前清洗（184 列）        & 清洗顺序 \\
+S5   & Sunflower      & B2 + 短期/长期比值+趋势（191 列）& 动态行为 \\
+S6   & Four Leaf Clover & 在一级 OOF 预测上做 stacking & 预测互补 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{评价方法与数据安全}
+
+我们是严格对于所有 LightGBM 阶段使用相同五折分层划分、相同
+LightGBM 参数，主指标为折外 AUC（OOF AUC）。实验中为了方便判断，我们设计了一个描述性的标准，即平均增益为正，且至少 4/5 折同向，称为“稳定增益”；否则为“不稳定/证据不足”。
+
+我们给定每条 OOF 预测来自一个没见过该申请人的模型如下：
+\[\text{OOF}=\{(\texttt{SK\_ID\_CURR}_i, y_i, \hat p_i, \texttt{fold\_id}_i)\}_{i=1}^{n}.\]
+改方法相比训练集 AUC，OOF AUC 更可靠，因为每条预测都来自一个没有见过该申请人的子模型中。
+
+为了保证数据不泄漏，我们组在实验中统一按照每个群组聚合都只在当前训练折内拟合，对验证折或
+测试集的申请人仅作为查找表使用的原则。若验证折出现训练折未见过的 group，则用训练折上该聚合的
+全局均值填补。
+
+\subsection{S1/S2 详情与官方榜单}
+
+每个阶段均输出四个核心产物：\texttt{oof.parquet}（含 SK\_ID\_CURR、TARGET、fold\_id 与
+prediction）、\texttt{fold\_metrics.csv}、\texttt{feature\_names.txt}（特征列名，须与模型
+输入列完全一致）、\texttt{config.yaml}。此外加入 \texttt{--predict-test} 时额外输出
+\texttt{submission.csv}。实现校验每名训练申请人恰好出现一次、预测值有限且在 $[0,1]$ 内、
+折标识与 \texttt{folds.csv} 一致。
+
+S1 仅使用 application 表的 78 个特征，若干已知异常编码转为缺失
+（\texttt{DAYS\_EMPLOYED=365243}、\texttt{CODE\_GENDER=XNA} 等），作为对照，我们在实验中刻意排除比例特征、群组
+聚合、历史表特征与动态窗口，作为参照点。S2 在 S1 之上加入 fold-safe 的群组聚合原值（301 个
+特征，379 列总计），聚合涵盖贷款金额、年金、收入、商品价格、外部评分、年龄相关天数、家庭
+人数与车龄等核心变量，使用 min、mean、max、sum、var、median 函数，主要分组键包括
+“学历$\times$性别”“家庭状况$\times$学历”“家庭状况$\times$性别”及若干职业与地区组合。
+S2 只保留群组聚合原值，不构造 $x-\overline{x}_{g(i)}$ 形式的差值特征——差值保留到 S4。
+
+为了检验 Seedling 式的特征空间是否特别依赖非线性树模型，我们在同一套 379 维 S2 特征上额外
+训练了一个带 $L_2$ 正则的 Logistic 回归。数值变量在训练折内做中位数填补与标准化，类别变量
+做 one-hot 编码，转换时忽略未见类别。这个模型不是 S2 的主结果，而是一个桥接实验，同时也是
+后续 S6 stacking 阶段可能的输入之一。
+
+表~\ref{tab:official} 汇总所有已提交阶段的 Kaggle 官方 public/private AUC。
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{全阶段官方榜单汇总。}\label{tab:official}
+\begin{tabular}{lrrrr}
+\toprule
+阶段 & 特征数 & OOF AUC & Public AUC & Private AUC \\
+\midrule
+S1 & 78  & 0.757646 & 0.74770 & 0.74418 \\
+S2 & 379 & 0.757405 & 0.74656 & 0.74471 \\
+S2-full & 801 & 0.760329 & 0.74920 & 0.74859 \\
+S2-LR & 379 & 0.743054 & 0.73544 & 0.73049 \\
+B1 & 85  & 0.768159 & 0.76716 & 0.76307 \\
+S3 & 126 & 0.785109 & 0.78900 & 0.78562 \\
+S4 & 184 & 0.786169 & 0.79294 & 0.78666 \\
+B2 & 184 & 0.786196 & 0.79164 & 0.78686 \\
+S5 & 191 & 0.786342 & 0.79137 & 0.78696 \\
+S6-avg & 4 & 0.777088 & 0.77651 & 0.77079 \\
+S6-stack & 4 & 0.780383 & 0.78104 & 0.77552 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════
+% 第 2 章  问题一：早期增益归因
+% ════════════════════════════════════════════════════════════════════
+\section{问题一：早期增益来源}
+
+\subsection{对比设计与结果}
+
+问题一将早期（Chestnut $\to$ Blossom）拆为四组受控对比：S2$-$S1（群组聚合原值）、B1$-$S1
+（业务比例+EXT\_SOURCE）、S3$-$B1（五表历史聚合）、S2-LGBM$-$S2-Logistic（树非线性）。
+
+{\setstretch{1.5}
+B1 是桥接实验，仅新增 7 个特征——三个业务比例
+$\frac{\text{AMT\_ANNUITY}}{\text{AMT\_INCOME\_TOTAL}}$、
+$\frac{\text{AMT\_CREDIT}}{\text{AMT\_INCOME\_TOTAL}}$、
+$\frac{\text{AMT\_CREDIT}}{\text{AMT\_ANNUITY}}$，
+以及 EXT\_SOURCE\_1/2/3 的 mean、min、max、std——把“业务比例”从“多表历史”中剥离。
+S3 在 B1 之上接入五表历史聚合，并添加了41 个新特征。
+\par}
+
+\begin{table}[h]
+\centering\small
+\caption{问题一各阶段结果。}\label{tab:rq1-stages}
+\begin{tabular}{llrrrr}
+\toprule
+阶段 & 模型 & 特征数 & OOF AUC & 折 AUC 标准差 & 同向折数 \\
+\midrule
+S1 & LightGBM & 78  & 0.757646 & 0.002460 & --- \\
+S2 & LightGBM & 379 & 0.757405 & 0.002358 & 1/5 \\
+B1 & LightGBM & 85  & 0.768159 & 0.001864 & 5/5 \\
+S3 & LightGBM & 126 & 0.785109 & 0.001543 & 5/5 \\
+S2-Logistic & Logistic & 379 & 0.743054 & 0.003636 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\setlength{\tabcolsep}{6pt}
+\caption{问题一受控配对对比。}\label{tab:rq1-deltas}
+\begin{tabular}{l p{0.32\textwidth} r c p{0.14\textwidth}}
+\toprule
+对比 & 含义 & $\Delta$OOF AUC & 同向折数 & 稳定性 \\
+\midrule
+S2$-$S1 & 群组聚合原值 & $-0.000241$ & 1/5 & 不稳定 \\
+B1$-$S1 & 业务比例+EXT\_SOURCE & $+0.010513$ & 5/5 & 稳定 \\
+S3$-$B1 & 五表历史聚合 & $+0.016950$ & 5/5 & 稳定 \\
+S2-LGBM$-$S2-Logistic & 树非线性 & $+0.014350$ & 5/5 & 稳定 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,inner sep=5pt,font=\footnotesize},
+  arr/.style={-{Stealth[length=2.4mm]},thick}
+]
+\node[box,fill=gray!12]   (s1) at (0,0)      {S1\\0.7576};
+\node[box,fill=blue!8]    (s2) at (4.5,1.5)  {S2\\0.7574};
+\node[box,fill=yellow!18] (b1) at (4.5,-1.5) {B1\\0.7682};
+\node[box,fill=green!14]  (s3) at (9.0,-1.5) {S3\\0.7851};
+\draw[arr] (s1) -- (s2) node[midway,above,sloped,font=\footnotesize]{$\Delta=-0.0002$（不稳）};
+\draw[arr] (s1) -- (b1) node[midway,below,sloped,font=\footnotesize]{$\Delta=+0.0105$（稳）};
+\draw[arr] (b1) -- (s3) node[midway,above,font=\footnotesize]{$\Delta=+0.0170$（稳）};
+\end{tikzpicture}
+\caption{问题一 OOF AUC 增益树。}\label{fig:gain-tree}
+\end{figure}
+
+我们研究发现了几个重要的规律。我们发现群组聚合原值几乎对预测结果没有起到效果， S2 的 $\Delta=-0.000241$，五折中只有 1 折方向为正。301 个群组均值（比如某个学历和性别交叉群体的收入均值）跟底层个体变量高度共线，而且对群体内所有人取同一个值。LightGBM 本来就能直接在底层变量上做分裂，群组均值很难提供新的可分裂信息。在 \texttt{feature\_fraction=0.20} 的列采样下，大量这种低信息特征反而稀释了每棵树采到有效特征的概率。作为对照，诊断性的 S2-full（加入了群组差值特征）OOF AUC 相对 S1 提升了 $0.0027$，这说明信息并不在群体的绝对统计量里，而在个人值相对群体均值的偏离程度上，这也正是我们把差值特征留到 S4 的原因。
+
+关于业务比例的高效率，B1 只新增了 7 个特征就拿到了 $+0.01051$ 的稳定增益，单位特征增益达到 $1.50\times10^{-3}$，
+在问题一中是增益最高的，如表~\ref{tab:rq1-density}所示。EXT\_SOURCE 是外部征信机构给出的已经预消化过的风险评分，
+它们的 mean、min、max 捕捉了多个来源的共识水平，std 则捕捉了来源之间的分歧程度。当几个外部评分互相矛盾时，就存在较高的风险。三个业务比例则把申请人能否负担这笔贷款显式地表达了出来，年金除以收入、贷款除以收入刻画的是偿债压力，贷款除以年金近似刻画了还款期限结构。
+
+根据表6我们可以看出，多表历史聚合带来了最大的跃升。 S3 相对 B1 的 $+0.01695$ 是整个复现链中绝对增益最大的一步。
+历史表提供的是直接的行为证据，bureau 的在外负债规模刻画了现有负债负担，installments 的逾期比例刻画了历史还款纪律，previous\_application 的批准率则反映了这个人过往被金融机构接受的程度。这些关于“此人过去怎么还钱”的信息，任何单表静态字段都无法替代。把变长历史记录聚合到申请人粒度，本身就是本题最关键的表示步骤。每名申请人在 installments 表里可能有几十上百条记录，模型无法直接消费，只有先按申请人聚合成逾期比例、平均少还金额等统计量，这些行为信息才进入了模型可学习的特征空间。
+
+树的非线性效应导致的独立贡献方面，S2-LGBM 相对 S2-Logistic 的 $+0.01435$ 衡量了完全相同特征空间下模型非线性带来的价值。有意思的是，Logistic（OOF AUC 0.743）甚至低于 S1 的 LightGBM（0.758），这说明好特征加上线性模型不一定胜过树模型加上朴素特征，因此我们可以认为特征表示与模型能力是两个正交的维度。
+
+\begin{table}[h]
+\centering\small
+\caption{各特征块信息密度（$\Delta$AUC $\div$ 新增特征数）。}\label{tab:rq1-density}
+\begin{tabular}{lrrr}
+\toprule
+特征块 & 新增特征数 & $\Delta$OOF AUC & 每特征增益 \\
+\midrule
+S2 群组聚合 & 301 & $-0.000241$ & $\approx 0$ \\
+B1 业务比例 & 7   & $+0.010513$ & $+1.50\times10^{-3}$ \\
+S3 历史聚合 & 41  & $+0.016950$ & $+4.13\times10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+综合表5和表6的实验结果可以发现，跨折标准差从 S1 的 0.002460 降至 B1 的 0.001864 再降至 S3 的 0.001543，同时B1、S3 均为五折全部同向。从中可以看出有价值的特征
+不仅会抬升均值，还会压低五折间的波动，这对于我们选择特征具有重要意义。
+
+\subsection{问题一小结}
+
+综合本节分析，我们发现早期增益主要来自多表历史聚合，其次为业务比例与 EXT\_SOURCE 的贡献。普通群组聚合原值单独没有贡献。在我们的受控设置下，“多做 groupby 就会更好”这个常见直觉并不成立，群组信息真正的价值需要以相对位置的形式引入才能体现。
+
+把这些结果放回原始版本历史中，可以看到受控复现的价值所在。原始 Seedling 在公开榜上提升了大约 $0.005$，但那是群组聚合、群组差值和更多模型一并上线的综合结果。我们研究的受控 S2 单独只保留群组聚合原值，增益几乎为零，这说明 Seedling 被笼统地归功于 groupby 特征其实是不准确的，受控对比表明真正起作用的是一同引入的相对差值与模型扩展。同时我们也注意到，好特征加上线性模型不一定胜过树模型加上朴素特征，在 379 维特征上 Logistic（0.743）低于 S1 的 LightGBM（0.758），这说明特征表示与模型能力是两个正交的维度，我们在研究中固定模型只改特征，正是为了把特征表示的贡献单独量化表征出来。
+
+% ════════════════════════════════════════════════════════════════════
+% 第 3 章  问题二：后期增益归因
+% ════════════════════════════════════════════════════════════════════
+\section{问题二：后期增益的来源}
+
+\subsection{对比设计}
+
+问题二将 Blossom到Sunflower 的复合升级拆为三组独立对比：S4$-$S3（群体相对位置+最近窗口）、
+B2$-$S4（聚合前清洗修复）、S5$-$B2（短期/长期比值+趋势）。B2 是我们受控研究中最重要的桥接实验，
+与 S4 使用完全相同的 184 列特征，唯一区别是历史表聚合在清洗后的原表上计算。
+
+\subsection{结果与归因}
+
+\begin{table}[h]
+\centering\small
+\caption{问题二各阶段结果与配对对比。}\label{tab:rq2}
+\begin{tabular}{lrrrc}
+\toprule
+阶段 & 特征数 & OOF AUC & $\Delta$ vs 父阶段 & 同向折数 \\
+\midrule
+S3（Blossom）            & 126 & 0.785109 & ---          & --- \\
+S4（Tulip，群体+最近）   & 184 & 0.786169 & $+0.001060$  & 4/5 \\
+B2（清洗修复，桥接）     & 184 & 0.786196 & $\approx 0$  & 2/5 \\
+S5（Sunflower，动态特征）& 191 & 0.786342 & $\approx 0$  & 3/5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,inner sep=5pt,font=\footnotesize},
+  arr/.style={-{Stealth[length=2.4mm]},thick}
+]
+\node[box,fill=gray!12]   (s3) at (0,0)     {S3\\0.7851};
+\node[box,fill=blue!8]    (s4) at (4.5,0)   {S4\\0.7862};
+\node[box,fill=yellow!18] (b2) at (9.0,1.2) {B2\\0.7862};
+\node[box,fill=green!14]  (s5) at (9.0,-1.2){S5\\0.7863};
+\draw[arr] (s3) -- (s4) node[midway,above,font=\footnotesize]{$\Delta=+0.0011$（稳）};
+\draw[arr] (s4) -- (b2) node[midway,above,sloped,font=\footnotesize]{$\approx 0$（不稳）};
+\draw[arr] (b2) -- (s5) node[midway,left,font=\footnotesize]{$\approx 0$（不稳）};
+\end{tikzpicture}
+\caption{问题二 OOF AUC 增益树。}\label{fig:rq2-gain-tree}
+\end{figure}
+
+群体相对位置与最近窗口的贡献虽然稳定，但量级已经小了很多。S4 在原有基础上增加了 58 个特征，其中 30 个是群体相对位置特征，计算方式是个人值减去同职业、同学历或同性别群体的均值，以及这个差值的绝对值。另外 28 个是最近窗口行为特征，覆盖了最近 1 笔、3 笔和 5 笔贷款申请，以及最近 10 条和 50 条分期还款与 POS 消费记录。这一步的 OOF AUC 增益为 0.00106，五折中有四折方向一致，算得上稳定。不过这个增益只相当于问题一中历史聚合贡献的十六分之一。从机制上看，同样年收入五万元，对洗碗工和医生来说含义完全不同，相对位置特征把信息的视角从绝对值转换成了在同类人群中所处的位置。最近窗口的作用也类似，它把信息从全量均值转换成了近期的变化趋势。一个申请人过去五年的整体逾期率也许不算高，但如果最近十笔还款全部逾期，全量均值会掩盖这个恶化的信号，最近窗口就能把它暴露出来。此外，S4 中的群体相对位置只保留了差值和绝对差值，没有再保留群组均值原值。问题一的实验已经证明群组原值本身不带什么增量信息，所以我们不再重复加入。
+
+清洗修复在本实验设定下没有产生效果，B2 相对 S4 的增益接近零，五折中只有两折方向为正。我们仔细排查之后发现，这个结果不是实现上的错误，原因在于清洗的目标列压根就不在聚合范围之内。B2 清洗了 bureau 表中的几个日期字段，previous 表中的几个日期字段，以及 credit\_card 表中的几列金额字段，但 S3 和 S4 在做历史表聚合时用到的列完全不同。bureau 表只用了贷款金额、负债金额、逾期金额和日期，previous 表只用了申请金额、审批金额、决策天数和还款期数，credit\_card 表只用了余额、信用额度和逾期状态。所有被清洗的列都不在这些聚合范围内。这个结果在方法论上反而是有价值的，它说明清洗修复要想产生增益，清洗的列必须真正出现在后续的特征里，否则洗了也没有作用。
+
+动态比值与趋势特征同样没有带来稳定的增益，S5 新增了 7 个特征，其中 4 个是短期与长期的比值，另外 3 个是从 POS 表的逾期状态拟合出来的线性趋势。这一步的增益只有 0.00015，五折中仅三折方向一致，算不上稳定。我们分析有三个可能的原因。第一个原因是比值特征与已有的窗口特征之间存在高度冗余，LightGBM 在分裂过程中本身就可以隐式地构造出分子与分母的比较。第二个原因是 POS 表中百分之九十七的记录逾期状态都等于零，对这样稀疏的数据拟合趋势线，斜率的估计方差很大，能提取的信号非常有限。第三个原因是本实验的特征规模远小于原方案的 Sunflower 版本，原方案在数十列上同时计算窗口比值和趋势，可能是靠大量弱信号累积起来才获得可测量的提升。
+
+\subsection{与原始方案的对照}
+
+原始 Tulip 宣称 CV 提升了 $0.0065$，而我们的受控 S4 只取得了 $0.0011$。这个差额主要来自原方案同期加入的更丰富的聚合与手工特征，特征数量从大约 200 增加到了数百，而我们的 S4 严格控制只打开了群体相对位置和最近窗口两块，总共只增加了 58 列。因此原始方案中 $+0.0065$ 的增益里，只有大约 $+0.0011$ 可以被归因为相对位置与近期行为这一特定的信息组织方式，其余的部分来自同期加入的、本实验没有覆盖的更丰富的聚合与手工特征。类似地，原始 Sunflower 的 $+0.0045$ 增益，根据我们 B2 和 S5 的结果来看，几乎不能归因于清洗修复或动态比值和趋势，真正来源可能在于同期加入的大规模特征扩展，也就是聚合列扩到了几乎所有数值列，而不是清洁修复或动态分析本身。
+
+\subsection{问题二小结}
+
+综合以上三组受控对比，后期增益中唯一可以确认的稳定来源是群体相对位置和最近窗口行为（S4 相对 S3 提升了 $0.0011$，四折同向）。聚合前清洗修复在本实验的聚合列覆盖范围内没有产生增益，短期和长期比值与趋势特征也没有稳定的增益。后期精细化的收益仅为早期关系型表示增益的大约 1/15，当核心的关系型信息已经被提取之后，进一步精细化的实际收益高度依赖特征的覆盖广度。原始 Tulip 宣称的 CV $+0.0065$ 中只有大约 $+0.0011$ 可以归因于相对位置与近期行为这一特定的信息组织方式，其余来自同期加入的更丰富聚合与手工特征。原始 Sunflower 的 $+0.0045$ 增益，根据 B2 和 S5 的结果，几乎不能归因于清洗修复或动态特征，真正的来源可能在于大规模特征扩展，也就是聚合列扩到了几乎所有数值列。
+
+% ════════════════════════════════════════════════════════════════════
+% 第 4 章  问题三：Stacking 能否继续提升
+% ════════════════════════════════════════════════════════════════════
+\section{问题三：叠加后 Stacking 的性能评估}
+
+\subsection{实验设计}
+
+S6 的输入是四个一级模型的 OOF 预测矩阵
+$Z = [p_{\text{lr}}^{\text{s2}}, p_{\text{lgb}}^{\text{s3}}, p_{\text{lgb}}^{\text{s4}},
+p_{\text{lgb}}^{\text{s5}}] \in \mathbb{R}^{n\times4}$。文中分别采用简单平均与二层 CV 下的 L2-Logistic Stacking两种实验策略分别进行验证，并比较实验结果。
+
+（1）简单平均： $\hat p_i^{\text{avg}} = \frac{1}{4}\sum_{j=1}^4 Z_{i,j}$，无需任何训练。
+
+（2）二层 CV 下的 L2-Logistic Stacking： 复用 \texttt{folds.csv} 五折划分，对每折用其余
+四折的 $(Z,y)$ 拟合 $L_2$-Logistic 元模型，对该折做预测，五折拼接得到 stacking OOF。
+
+\subsection{结果与归因}
+
+\begin{table}[h]
+\centering\small
+\caption{S5 与两种 stacking 方法的 OOF AUC 和官方榜单。}\label{tab:rq3-stages}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrrr}
+\toprule
+方法 & OOF AUC & Public & Private & $\Delta$ vs S5 & 同向折数 \\
+\midrule
+S5（最优单模型）          & 0.786342 & 0.79137 & 0.78696 & ---           & --- \\
+简单平均                  & 0.777088 & 0.77651 & 0.77079 & $-0.009254$   & 0/5 \\
+L2-Logistic stacking      & 0.780383 & 0.78104 & 0.77552 & $-0.005959$   & 0/5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+如表9所示，两项对比结果表明五折全部为负，说明stacking 不仅无增益，反而显著退步，官方 public/private 也均低于 S5。
+
+\begin{table}[h]
+\centering\small
+\caption{一级模型 OOF 预测相关矩阵。}\label{tab:rq3-corr}
+\begin{tabular}{lrrrr}
+\toprule
+& S2-LR & S3    & S4    & S5 \\
+\midrule
+S2-LR & 1.000 & 0.726 & 0.720 & 0.721 \\
+S3    & 0.726 & 1.000 & 0.979 & 0.978 \\
+S4    & 0.720 & 0.979 & 1.000 & 0.991 \\
+S5    & 0.721 & 0.978 & 0.991 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+为了解释上面现象，我们列出了四列一级 OOF 预测的相关系数矩阵，如表10所示。这个矩阵很好地解释了stacking 在本实验中无效甚至起到相反效果的直接原因。
+根据实验结果，我们发现一级预测高度相关是退步的主要原因。 S3/S4/S5 三者的相关系数$\rho=0.978\text{--}0.991$，预测相关性极高，输出预测
+几乎相同，说明三个 LightGBM 几乎在犯相同的错误，提供的互补信息极少。虽然S2-LR 与 LightGBM 系列适度
+互补（相关系数$\rho\approx0.72$），但其自身 AUC 仅为 0.743，比 S5 低 0.043。元模型
+$\hat p=\sigma(\beta_0+\sum\beta_j p_j)$ 在 $p_3,p_4,p_5$ 高度共线时，$\beta_2,\beta_3,\beta_4$
+的估计方差极大，退化成一个对 $p_5$ 和 $p_{\mathrm{lr}}$ 的加权平衡器，但是由于 $p_{\mathrm{lr}}$ 信号
+质量太差，严重拖低了任何包含它的加权，因此导致实验结果呈现下降趋势。
+
+对比两种集成策略可以看出，简单平均将四列一级预测等权混合，由于 S3/S4/S5 高度共线，其加权结果与 S5 本身差异甚微，但 S2-LR 的噪声以 25\% 的权重被强制引入，
+导致 AUC 显著下降。Logistic Stacking 则通过数据驱动的方式学习最优权重，理论上可以压制 S2-LR 的贡献、放大 S5 的作用，因此其 AUC优于简单平均，
+但是S2-LR 的低质量信号依然对集成结果产生拖累，导致 Logistic Stacking 仍未能超越最优单模型 S5。
+
+\begin{table}[h]
+\centering\small
+\caption{Logistic stacking 元模型系数。}\label{tab:meta-coeffs}
+\begin{tabular}{lr}
+\toprule
+输入 & 系数 \\
+\midrule
+$p_{\text{lr}}^{\text{s2}}$ (S2-LR) & $+1.716$ \\
+$p_{\text{lgb}}^{\text{s3}}$ (S3)   & $+1.800$ \\
+$p_{\text{lgb}}^{\text{s4}}$ (S4)   & $+2.290$ \\
+$p_{\text{lgb}}^{\text{s5}}$ (S5)   & $+3.516$ \\
+截距 & $-1.709$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+元模型系数排序如表11所示，结果基本符合理论分析。S5 最高权重（3.52），S2-LR 最低（1.72）。Logistic stacking 确实识别出
+了 S5 是最优单模型。但二层 CV 的严格性导致在每折子集上，S2-LR 偶尔表现微弱互补价值，使元模型
+不忍将其权重压至零。在全集 OOF 上评估时，这种微弱优势不足以抵消 S2-LR 引入的噪声。
+
+\subsection{与原始方案的对照}
+
+原始 Four Leaf Clover 报告约 $+0.0025$ CV 增益（0.7950 提升到 0.7975），我们分析认为其 stacking 输入
+更多样——在多个不同特征子集上的 LightGBM（如一个只用 bureau、一个只用 application），即
+“横向切分”，不同特征预测相关性显著低于本实验 S3$\to$S4$\to$S5 的纵向叠加。当一级模型预测夹角
+足够大时，stacking 能取长补短，当它们几乎共线时则不能。此外原始方案具有更多特征列和更大的模型多样性，因此预测能力显著由于本节提出的方案。
+
+归纳分析本节实验方案以及结果，我们发现在特征纵向叠加范式下，即使把从 S2 到 S5 所有级别的模型
+预测都交给 stacking进行集成，也无法从高度同质的 LightGBM 系列中提取额外增益。因此stacking 本身的预测水平高度依赖于一级预测之间的互补性，而非一级预测的数量或特征数。
+
+\subsection{问题三小结}
+
+综合本小结研究我们发现，简单平均和 L2-Logistic stacking 均未能超越最优单模型 S5。我们认为的退步原因在于S3/S4/S5 高度相关（$\rho>0.978$），几无互补信号，S2-LR 虽适度
+互补但自身 AUC 过低。因此Stacking 不能保证预测水平一定有提升，其预测水平取决于一级预测的互补性，而不是一级预测的数量。
+
+% ════════════════════════════════════════════════════════════════════
+% 第 5 章  总结与结论
+% ════════════════════════════════════════════════════════════════════
+\section{总结与反思}
+
+\subsection{完整证据链}
+下面我们总结了全部受控阶段概览与S1到S6的完整证据链，如表12和图3所示。
+\begin{table}[h]
+\centering\small
+\caption{全部受控阶段概览。}\label{tab:full-chain}
+\begin{tabular}{lllrr}
+\toprule
+阶段 & 新增内容 & 特征数 & OOF AUC & $\Delta$ vs 父阶段 \\
+\midrule
+S1   & application 基准特征 & 78   & 0.757646 & --- \\
+S2   & +群组聚合原值 & 379  & 0.757405 & $-0.000241$ \\
+B1   & +业务比例+EXT\_SOURCE & 85 & 0.768159 & $+0.010513$ \\
+S3   & +五表历史聚合 & 126  & 0.785109 & $+0.016950$ \\
+S4   & +群体相对位置+最近窗口 & 184 & 0.786169 & $+0.001060$ \\
+B2   & +聚合前清洗（无效）& 184 & 0.786196 & $\approx 0$ \\
+S5   & +短期/长期比值+趋势 & 191 & 0.786342 & $\approx 0$ \\
+S6-avg   & 简单平均 stacking & 4 & 0.777088 & $-0.009254$ \\
+S6-stack & L2-Logistic stacking & 4 & 0.780383 & $-0.005959$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,inner sep=4pt,font=\scriptsize},
+  arr/.style={-{Stealth[length=2.0mm]},thick}
+]
+\node[box,fill=gray!12]    (s1)    at (0,0.3)          {S1\\0.7576};
+\node[box,fill=yellow!18]  (b1)    at (3.2,2.6)      {B1\\0.7682};
+\node[box,fill=green!14]   (s3)    at (6.5,1.8)      {S3\\0.7851};
+\node[box,fill=blue!8]     (s4)    at (9.8,3.2)      {S4\\0.7862};
+\node[box,fill=purple!12]  (b2)    at (9.8,1.2)      {B2\\0.7862};
+\node[box,fill=orange!20]  (s5)    at (13.2,2.2)     {S5\\0.7863};
+\node[box,fill=red!12]     (avg)   at (13.2,3.8)     {S6-avg\\0.7771};
+\node[box,fill=red!12]     (stack) at (13.2,0.6)     {S6-stk\\0.7804};
+\draw[arr] (s1) -- (b1) node[midway,above,sloped,font=\scriptsize]{$+0.0105$稳};
+\draw[arr] (b1) -- (s3) node[midway,above,font=\scriptsize]{$+0.0169$稳};
+\draw[arr] (s3) -- (s4) node[midway,above,sloped,font=\scriptsize]{$+0.0011$稳};
+\draw[arr] (s4) -- (b2) node[midway,left,font=\scriptsize]{$\approx 0$};
+\draw[arr] (b2) -- (s5) node[midway,above,font=\scriptsize]{$\approx 0$};
+\draw[arr,red!70!black] (s5) -- (avg)  node[midway,right,font=\scriptsize]{$-0.0093$};
+\draw[arr,red!70!black] (s5) -- (stack) node[midway,right,font=\scriptsize]{$-0.0060$};
+\end{tikzpicture}
+\caption{从 S1 到 S6 的完整证据链。黑色箭头为稳定增益，红色箭头为负效应。}\label{fig:final-chain}
+\end{figure}
+
+\subsection{研究结论与核心发现}
+我们针对原方案的三个问题进行了受控复现研究，得出以下结论：
+
+（1）早期阶段，从 S1（0.758）到 S3（0.785）的 $+0.027$ 中可以看出，最大
+稳定来源是多表历史聚合（$+0.01695$），其次是业务比例与 EXT\_SOURCE（$+0.01051$），
+普通群组聚合原值对结果几乎无贡献。
+
+（2）后期阶段，从 S3（0.785）到 S5（0.786）的 $+0.0012$ 微升中可以看出，提升唯一
+确认的来源是群体相对位置和最近窗口（$+0.00106$）。清洗修复与本实验聚合范围不匹配，因此几乎无增益。
+动态比值与趋势无稳定增益。
+
+（3）叠加Stacking后，简单平均和 Logistic stacking 均未能超越 S5（退步
+$-0.006$ 至 $-0.009$），因为 S3/S4/S5 预测高度相关（$\rho>0.978$）。在特征纵向叠加范式下，
+stacking 不产生增益，反而因为S2预测精度较低而产生负效应。
+
+
+我们最终认为 S5（191 维，OOF AUC 0.786342，Kaggle private 0.78696）为最优单模型。
+
+\subsection{研究反思}
+
+我们研究采用了受控复现的方法，通过B1和B2两个桥接实验将原本耦合的多项改动逐一拆解。
+B1剥离了“业务比例”与“多表历史”的混杂效应，避免后者的增益被重复归因至前者，B2则揭示了一项
+原方案文档未明确的事实，即清洗修复仅在清洗列被后续聚合特征覆盖时才能产生增益，否则不构成有效
+干预。所有涉及折内统计量的操作均在训练折上拟合，验证折仅用于转换，不参与任何统计量的构造，
+从而从根本上避免了信息泄漏。
+
+我们判断增益是否稳定，没有用 $p$ 值，因为只有 5 折，$p$ 值本身也不一定可靠。我们用的是更朴素的规则，平均涨了，而且 5 折里至少 4 折都朝同一个方向涨，才算稳定增益。
+我们报告的每一个增益，都是该特征块在受控条件下的保守估计，即便在更丰富的特征空间里某些机制的增益可能更明显，但这不是我们讨论的问题。
+同时，我们研究采用的受控复现不等同于原样复刻。前者要的是干净的因果推断，后者要的是分数的完全匹配。我们选了前者，所以我们报告的每一个增量，都只是在限定条件下的下限估计。
+
+
+\end{document}
