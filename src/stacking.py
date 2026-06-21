@@ -291,6 +291,10 @@ def _update_summary(
         row[col] = np.nan
 
     matched = (summary["stage"] == stage_name) & (summary["model"] == "stacking")
+    if matched.any():
+        existing_kaggle = summary.loc[matched, kaggle_cols].iloc[-1]
+        for col in kaggle_cols:
+            row.loc[0, col] = existing_kaggle[col]
     summary = summary[~matched]
     summary = pd.concat([summary, row], axis=0, ignore_index=True)
     summary.to_csv(summary_path, index=False)

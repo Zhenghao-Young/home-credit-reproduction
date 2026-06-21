@@ -58,8 +58,8 @@
 | S4 | LightGBM | 0.786169 | 0.79294 | 0.78666 | 184 |
 | B2 | LightGBM | 0.786196 | 0.79164 | 0.78686 | 184 |
 | S5 | LightGBM | 0.786342 | 0.79137 | 0.78696 | 191 |
-| S6-Avg | Stacking | 0.777088 | — | — | 4 |
-| S6-Stack | Stacking | 0.780383 | — | — | 4 |
+| S6-Avg | Stacking | 0.777088 | 0.77651 | 0.77079 | 4 |
+| S6-Stack | Stacking | 0.780383 | 0.78104 | 0.77552 | 4 |
 
 RQ1 当前关键增量：
 
@@ -95,7 +95,7 @@ RQ2 当前关键增量：
 
 ## 官方提交状态
 
-S1、S2、S2-full、S2-Logistic、B1、S3、S4、B2 和 S5 均已提交到 Kaggle
+S1、S2、S2-full、S2-Logistic、B1、S3、S4、B2、S5、S6-Avg 和 S6-Stack 均已提交到 Kaggle
 `home-credit-default-risk`，状态均为 `SubmissionStatus.COMPLETE`。官方 public/private AUC
 记录在 `results/summary.csv` 的 `kaggle_*` 列中。
 
@@ -116,11 +116,11 @@ S1、S2、S2-full、S2-Logistic、B1、S3、S4、B2 和 S5 均已提交到 Kaggl
 
 RQ3 当前关键发现：
 
-| 方法 | OOF AUC | Δ vs S5 |
-| --- | ---: | ---: |
-| S5 (最佳单模型) | 0.786342 | — |
-| 简单平均 (S2-LR + S3 + S4 + S5) | 0.777088 | -0.009254 |
-| L2-Logistic stacking | 0.780383 | -0.005959 |
+| 方法 | OOF AUC | Kaggle public AUC | Kaggle private AUC | Δ vs S5 |
+| --- | ---: | ---: | ---: | ---: |
+| S5 (最佳单模型) | 0.786342 | 0.79137 | 0.78696 | — |
+| 简单平均 (S2-LR + S3 + S4 + S5) | 0.777088 | 0.77651 | 0.77079 | -0.009254 |
+| L2-Logistic stacking | 0.780383 | 0.78104 | 0.77552 | -0.005959 |
 
 - S3、S4、S5 的 OOF 预测高度相关（ρ = 0.978–0.991），几乎犯相同错误，互补性极弱。
 - S2-LR 与 LightGBM 预测相关性较低（ρ ≈ 0.72），但自身 AUC 太低（0.743），拖低平均值。

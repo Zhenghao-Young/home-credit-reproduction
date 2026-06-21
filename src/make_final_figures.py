@@ -52,15 +52,21 @@ def build_stacking_results(results_dir: Path) -> pd.DataFrame:
     """Build S5 vs simple avg vs logistic stacking comparison table."""
     summary = pd.read_csv(results_dir / "summary.csv")
 
-    def _get_auc(stage: str, model: str) -> float:
+    def _get_summary_row(stage: str, model: str) -> pd.Series:
         row = summary[(summary["stage"] == stage) & (summary["model"] == model)]
         if row.empty:
             raise ValueError(f"No summary row for {stage}/{model}")
-        return float(row.iloc[0]["oof_auc"])
+        return row.iloc[0]
 
-    s5_auc = _get_auc("s5", "lightgbm")
-    s6_avg_auc = _get_auc("s6_avg", "stacking")
-    s6_stack_auc = _get_auc("s6_stack", "stacking")
+    s5_row = _get_summary_row("s5", "lightgbm")
+    s6_avg_row = _get_summary_row("s6_avg", "stacking")
+    s6_stack_row = _get_summary_row("s6_stack", "stacking")
+    s5_auc = float(s5_row["oof_auc"])
+    s6_avg_auc = float(s6_avg_row["oof_auc"])
+    s6_stack_auc = float(s6_stack_row["oof_auc"])
+
+    def _official_score(row: pd.Series, column: str) -> float:
+        return float(row[column]) if column in row and pd.notna(row[column]) else np.nan
 
     s5_folds = pd.read_csv(results_dir / "s5" / "fold_metrics.csv")
     s6_folds = pd.read_csv(results_dir / "s6" / "fold_metrics.csv")
@@ -85,6 +91,8 @@ def build_stacking_results(results_dir: Path) -> pd.DataFrame:
         {
             "method": "S5: best single model (LightGBM)",
             "oof_auc": s5_auc,
+            "kaggle_public_auc": _official_score(s5_row, "kaggle_public_auc"),
+            "kaggle_private_auc": _official_score(s5_row, "kaggle_private_auc"),
             "delta_vs_s5": 0.0,
             "fold_delta_mean": 0.0,
             "fold_delta_std": 0.0,
@@ -94,6 +102,8 @@ def build_stacking_results(results_dir: Path) -> pd.DataFrame:
         {
             "method": "Simple average (s2_lr + s3 + s4 + s5)",
             "oof_auc": s6_avg_auc,
+            "kaggle_public_auc": _official_score(s6_avg_row, "kaggle_public_auc"),
+            "kaggle_private_auc": _official_score(s6_avg_row, "kaggle_private_auc"),
             "delta_vs_s5": s6_avg_auc - s5_auc,
             "fold_delta_mean": avg_delta_mean,
             "fold_delta_std": avg_delta_std,
@@ -103,6 +113,8 @@ def build_stacking_results(results_dir: Path) -> pd.DataFrame:
         {
             "method": "L2-Logistic stacking (s2_lr + s3 + s4 + s5)",
             "oof_auc": s6_stack_auc,
+            "kaggle_public_auc": _official_score(s6_stack_row, "kaggle_public_auc"),
+            "kaggle_private_auc": _official_score(s6_stack_row, "kaggle_private_auc"),
             "delta_vs_s5": s6_stack_auc - s5_auc,
             "fold_delta_mean": stack_delta_mean,
             "fold_delta_std": stack_delta_std,
