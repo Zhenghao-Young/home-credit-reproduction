@@ -23,7 +23,6 @@ import numpy as np
 import pandas as pd
 
 ID_COLUMN = "SK_ID_CURR"
-EPS = 1e-6
 
 # ── feature name lists ─────────────────────────────────────────────────
 
@@ -48,15 +47,16 @@ DYNAMIC_FEATURE_NAMES = DYNAMIC_RATIO_NAMES + DYNAMIC_TREND_NAMES
 def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     n = pd.to_numeric(numerator, errors="coerce")
     d = pd.to_numeric(denominator, errors="coerce")
-    result = n / (d + EPS)
-    result = result.where(d.notna() & n.notna())
+    result = n / d
+    result = result.where(d.notna() & (d != 0) & n.notna())
     return result.where(np.isfinite(result), np.nan)
 
 
 # ── trend computation ──────────────────────────────────────────────────
 
 def _trend_slope(y: np.ndarray) -> float:
-    """Linear slope via polyfit.  Returns NaN when fewer than 2 points."""
+    """Linear slope via polyfit.  Returns NaN when fewer than 2 valid points."""
+    y = y[~np.isnan(y)]
     if len(y) < 2:
         return np.nan
     return float(np.polyfit(np.arange(len(y)), y, 1)[0])

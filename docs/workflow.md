@@ -260,13 +260,15 @@ C:\Users\Hwa\.kaggle\kaggle.json
 .\.venv\Scripts\python.exe -m src.submit_kaggle_scores --dry-run
 ```
 
-正式提交当前已有 `results/<stage>/submission.csv` 的版本：
+正式提交当前已有 Kaggle submission 文件的版本：
 
 ```powershell
 .\.venv\Scripts\python.exe -m src.submit_kaggle_scores
 ```
 
-脚本默认提交 `home-credit-default-risk`，并按 `summary.csv` 中的 OOF AUC 从高到低提交。
+脚本默认提交 `home-credit-default-risk`，并按 `summary.csv` 中的 OOF AUC 从高到低提交。普通阶段使用
+`results/<stage>/submission.csv`；S6 的两个 stacking 版本分别使用
+`results/s6/submission_simple_average.csv` 和 `results/s6/submission_logistic_stack.csv`。
 若遇到 Kaggle 当日提交额度或 API 拒绝，脚本会保留已经写回的官方成绩，并列出剩余版本供下一批继续提交。
 
 `results/summary.csv` 中的官方分数列含义：
